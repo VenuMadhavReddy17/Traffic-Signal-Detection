@@ -6,6 +6,8 @@
 
 > **Before submitting:** Follow each "Steps to Reproduce" section, take screenshots at each numbered step, and attach them to the HackerOne report. Each report below is formatted for direct copy-paste into HackerOne.
 
+> **IMPORTANT — Default vs Modified Config:** Some vulnerabilities only work when admins change non-default settings. Each report clearly states what is required. Only Reports 1, 2, 3, and 4 work on a completely default, unmodified Nexus installation. The HackerOne triage team will test against defaults — be honest about prerequisites.
+
 ---
 
 ## Pre-requisites: Setting Up a Test Nexus Instance
@@ -13,9 +15,9 @@
 You need a local Nexus instance for reproduction. Use Docker:
 
 ```bash
-# Pull and run Nexus Repository Manager OSS
-docker pull sonatype/nexus3:3.89.0
-docker run -d -p 8081:8081 --name nexus sonatype/nexus3:3.89.0
+# Pull and run Nexus Repository Manager OSS (latest)
+docker pull sonatype/nexus3:latest
+docker run -d -p 8081:8081 --name nexus sonatype/nexus3:latest
 
 # Wait ~2 minutes for startup, then get the initial admin password
 docker exec nexus cat /nexus-data/admin.password
@@ -23,19 +25,35 @@ docker exec nexus cat /nexus-data/admin.password
 
 - Nexus UI: `http://localhost:8081`
 - Default admin user: `admin`
-- Password: output from the command above (or `admin123` if random password generation is off)
+- Password: random UUID from the command above (initial password is randomized)
+- Anonymous access: **disabled by default**
+- Scripting: **disabled by default since Nexus 3.21.2**
 
-After first login, Nexus will prompt you to change the password. Set it to something memorable (e.g., `Admin@123`). When asked about anonymous access, enable it for testing.
+Accept the EULA via the API (required before most operations work):
+```bash
+ADMIN_PASS=$(docker exec nexus cat /nexus-data/admin.password)
+
+# Get and accept EULA
+DISCLAIMER=$(curl -s -u "admin:$ADMIN_PASS" http://localhost:8081/service/rest/v1/system/eula | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin)['disclaimer']))")
+curl -X POST http://localhost:8081/service/rest/v1/system/eula \
+  -u "admin:$ADMIN_PASS" \
+  -H 'Content-Type: application/json' \
+  -d "{\"accepted\":true,\"disclaimer\":$DISCLAIMER}"
+```
+
+**Do NOT enable anonymous access or scripting** — test against defaults first to establish what's exploitable out of the box.
 
 ---
 
 # REPORT 1: Remote Code Execution via Groovy Script API Sandbox Bypass
 
+> **DEFAULT CONFIG NOTE:** Script creation/execution is **disabled by default** since Nexus 3.21.2. This vulnerability requires an admin to explicitly set `nexus.scripts.allowCreation=true`. File this as a **sandbox bypass** (the sandbox provides no real security when scripting is intentionally enabled), not as an RCE-from-default.
+
 ## Title
-Remote Code Execution via Groovy Script API — SecureASTCustomizer Sandbox Only Blocks `java.lang.System`, Trivially Bypassable
+Groovy Script API Sandbox Bypass — SecureASTCustomizer Only Blocks `java.lang.System`, Trivially Bypassable When Scripting Is Enabled
 
 ## Severity
-**Critical** — CVSS 9.1 (AV:N/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H)
+**High** — CVSS 8.2 (AV:N/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H) — downgraded from Critical because scripting is disabled by default
 
 ## Vulnerability Type
 CWE-94: Improper Control of Generation of Code ('Code Injection')
@@ -475,11 +493,13 @@ Users with `nexus:ssl-truststore:read` can use Nexus as a TCP/TLS proxy to:
 
 # REPORT 4: Hardcoded Default Admin Password with Silent Fallback
 
+> **DEFAULT CONFIG NOTE:** The initial admin password is now a **random UUID** written to `/nexus-data/admin.password`. The `admin123` constant is a **fallback that only activates on file write failure**. This is a code-level finding, not a runtime default-credential issue.
+
 ## Title
-Hardcoded Default Admin Password `admin123` with Silent Fallback on File Write Failure
+Hardcoded Fallback Admin Password `admin123` Activates Silently on Password File Write Failure
 
 ## Severity
-**High** — CVSS 7.0 (AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H)
+**Medium** — CVSS 5.9 (AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H) — downgraded because initial password is now randomized
 
 ## Vulnerability Type
 CWE-798: Use of Hard-coded Credentials
@@ -1120,17 +1140,30 @@ For each report you submit to HackerOne:
 
 ## Recommended Submission Order
 
-Submit in this order (highest impact first):
+### Tier 1 — Exploitable on Default Configuration (submit these first)
 
-1. **Report 1** — Groovy RCE (Critical, most dramatic PoC)
-2. **Report 9** — SQL Injection (Critical, systemic issue)
-3. **Report 6** — Unsafe Deserialization (High, chains with SQLi)
-4. **Report 2** — SSRF Proxy (High, default configuration)
-5. **Report 3** — SSRF Certificate (High, easy to demonstrate)
-6. **Report 4** — Default Credentials (High, well-known but still impactful)
-7. **Report 5** — Stored XSS (Medium, clear PoC)
-8. **Report 7** — Legacy Hashing (High, requires DB access to prove)
-9. **Report 8** — Missing Auth (Low, easy to prove)
-10. **Report 10** — Path Traversal (Medium, conditional on dev-mode)
+1. **Report 2** — SSRF via Proxy (High, works on default config, admin auth only)
+2. **Report 3** — SSRF via Certificate Retrieval (High, works on default, admin auth)
+3. **Report 8** — Unauthenticated Info Disclosure (Low, zero auth required, default config)
 
-> **Important:** Some of these may be known issues or accepted risks by Sonatype. Check if Sonatype has a HackerOne program or responsible disclosure policy at https://www.sonatype.com/report-a-security-vulnerability before submitting.
+### Tier 2 — Valid Code Findings (submit as design/architecture issues)
+
+4. **Report 9** — SQL Injection Pattern (Critical pattern, MyBatis `${}`)
+5. **Report 6** — Unsafe Deserialization (High, requires DB access chain)
+6. **Report 1** — Groovy RCE Sandbox Bypass (Critical when enabled, but disabled by default since 3.21.2 — file as sandbox bypass, not default RCE)
+7. **Report 7** — Legacy Password Hashing (High, requires DB dump)
+
+### Tier 3 — Conditional / May Be Rejected as Informational
+
+8. **Report 4** — Default Credentials (admin123 fallback exists in code, but initial password is now randomized)
+9. **Report 5** — Stored XSS (admin-to-admin, requires branding capability)
+10. **Report 10** — Path Traversal (dev-mode only, not production)
+
+### Key Honesty Points for Triage
+
+- **Groovy RCE** is impressive but requires `nexus.scripts.allowCreation=true` which is NOT default. Be upfront about this.
+- **SSRF via Proxy** is the strongest finding — it works on every default installation with just admin credentials and `allowPrivateNetworks` defaults to `true`.
+- **Upload-specs info disclosure** is the only truly zero-auth finding on default config.
+- **admin123** is no longer the actual default password — it's a fallback constant in an error path.
+
+> **Important:** Check Sonatype's disclosure policy at https://www.sonatype.com/report-a-security-vulnerability before submitting. Some of these may be known/accepted risks.
