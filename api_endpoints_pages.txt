@@ -1,0 +1,298 @@
+# API endpoints discovered in /workspace/js_pages/*.chunk.js (staging bundle analysis)
+# Date: 2026-03-28
+# Note: Paths below are relative to the app origin (e.g. https://my.staging.found.com).
+# Some calls use absolute URLs with dynamic host (e.g. https://${subdomain}.found.com/api/...).
+
+## Relative /api paths (template literals as in source)
+
+GET/POST  /api/accountant/client-resources-pdf?invite_code={invite_code}
+POST      /api/book-entry/v2/set-reason
+GET       /api/bulk1099-export/{id}/download?jwt={jwt}
+POST      /api/business/email-direct-deposit-form
+POST      /api/business/email-signed-bank-letter
+POST      /api/change-email/v2
+POST      /api/change-password
+POST      /api/contractor-login/dismiss
+POST      /api/email-security-code
+PUT       /api/invoice-recipient/link?invoice_jwt={jwt}
+POST      /api/invoice-recipient/v2/mark-as-paid?invoice_jwt={jwt}
+GET       /api/invoice/check-identifier?identifier={identifier}&estimate={boolean}
+POST      /api/linked-account/v2/link-via-account-routing
+POST      /api/onboarding/send-phone-verification-code
+POST      /api/plaid/link-token
+POST      /api/plaid/v2/link-account
+GET       /api/public-invoice/{invoice_id}/attachment-url?invoice_attachment_id={id}
+GET       /api/public-invoice/{invoice_id}/download-attachment?attachment_jwt={jwt}
+GET       /api/public-invoice/{invoice_id}/pdf
+POST      /api/sms-security-code
+POST      /api/spend-incentive/opt-in
+GET       /api/stripe/redirect?return_to={url}   (also as https://{host}.found.com/api/stripe/redirect?return_to=...)
+POST      /api/upload
+POST      /api/v2/change-verified-phone
+POST      /api/v2/update-dob
+POST      /api/v2/update-name-ssn
+POST      /api/verify-code
+
+## External marketing/help URLs (not backend APIs; referenced in UI)
+
+https://found.com/guides/home-office-deduction
+https://found.com/help/... (multiple help articles)
+https://found.com/legal/...
+https://found.com/resources/how-to-end-your-tax-year-right
+
+# --- Client-side routes (React Router path values) ---
+# Includes literal paths, params (:token), and interpolated segments (${CONST}).
+
+/
+/account
+/account-freeze-review
+/account-settings
+/account-settings/change-address
+/account-settings/change-email
+/account-settings/change-password
+/account-settings/change-phone
+/account-settings/change-pin/:token?
+/account-settings/change-preferred-name
+/account/account-menu
+/account/avatar-logo-edit
+/account/business-information
+/account/business-names/additional-names
+/account/business-names/primary
+/account/business-profiles
+/account/change-address
+/account/change-business-ein
+/account/change-business-name
+/account/change-business-start-date
+/account/change-business-structure
+/account/change-business-type
+/account/change-email
+/account/change-found-tag
+/account/change-password
+/account/change-phone
+/account/change-pin/:token?
+/account/change-preferred-name
+/account/change-website
+/account/connect-wth-account-management
+/account/expense-audit-report
+/account/home-office-setting
+/account/inbox
+/account/kyc-renewal
+/account/linked-account
+/account/mileage-setting
+/account/offers
+/account/offers/spend-incentives
+/account/schedule-c/:year?
+/account/settings
+/account/settings/:type
+/account/settings/banking/external-ach
+/account/share/account-info
+/account/statements
+/account/support
+/account/support/contact
+/accountant
+/accountant/business/
+/accountant/business/:businessId
+/accountant/business/:businessId${Ql.EDIT_INTERNAL_NOTE_MODAL}
+/accountant/business/:businessId${Ql.EDIT_NOTE_MODAL}
+/accountant/business/:businessId${Qo.EXPORT_REPORT_MODAL}
+/accountant/business/:businessId/account/reports
+/accountant/business/:businessId/activity
+/accountant/business/:businessId/activity/import/staged/:id
+/accountant/business/:businessId/documents
+/accountant/business/:businessId/documents/schedule-c
+/accountant/business/:businessId/modal/activity-tags/:token
+/accountant/business/:businessId/modal/edit-tag/:token
+/accountant/business/:businessId/statements/${e}
+/accountant/business/:businessId/statements/:year?
+/accountant/half-blade/:half_blade_id+
+/accountant/half-blade/business/:businessId/activity
+/accountant/half-blade/business/:businessId/activity-rules-hub
+/activity
+/activity-receipt/:activityId
+/activity/import
+/activity/import/ftux
+/activity/quick-search
+/banking
+/banking/add-debit-card
+/banking/add-money
+/banking/add-money/apps
+/banking/add-money/direct-deposit
+/banking/add-money/direct-deposit-v2
+/banking/add-money/external-bank-transfer
+/banking/add-money/instant
+/banking/add-money/link-platform
+/banking/add-money/more-apps
+/banking/add-money/share-wire-instructions
+/banking/deposit-cash
+/banking/deposit-check
+/banking/documents
+/banking/documents/:formType
+/banking/limits
+/banking/limits/upgrade-info
+/banking/limits/upgrade-info/:category
+/banking/replace-card/:token?
+/banking/request-check-deposits
+/banking/send-money
+/banking/taxes
+/banking/taxes/breakdown
+/banking/taxes/contractor-1099
+/banking/taxes/filing
+/banking/taxes/filing/direct-deposit
+/banking/taxes/mileage
+/banking/taxes/mileage/trips
+/banking/taxes/move-money
+/banking/transfer-money
+/banking/transfer-money/initiate
+/banking/verify-debit-card
+/business-banking
+/business-switcher
+/business-verification
+/business/
+/business/:businessId/
+/contacts/:token/contractor
+/deposit-review
+/download-app
+/found-assistant
+/half-blade
+/half-blade${Zm.ADD_CONTRACTOR}
+/half-blade${Zm.INDEX}
+/half-blade/:halfBlade_id
+/half-blade/account
+/half-blade/account/account-menu
+/half-blade/account/business-information
+/half-blade/account/business-names/additional-names
+/half-blade/account/business-names/primary
+/half-blade/account/inbox
+/half-blade/account/settings/:type
+/half-blade/account/support
+/half-blade/accountant-share
+/half-blade/activity
+/half-blade/activity-import/:institutionId/list
+/half-blade/activity-import/:linkId/accounts
+/half-blade/activity-import/list
+/half-blade/activity-rules-hub
+/half-blade/business/:businessId/:halfBlade_id
+/half-blade/change-address
+/half-blade/change-preferred-name
+/half-blade/found-assistant
+/half-blade/invoices
+/half-blade/invoices/settings
+/half-blade/invoices/settings/customize
+/half-blade/invoices/settings/customize/note
+/half-blade/invoices/settings/due-date
+/half-blade/invoices/settings/payment-methods
+/half-blade/invoices/settings/payment-reminders
+/half-blade/invoices/settings/recurring-invoices
+/half-blade/pay-invoice
+/half-blade/pay-invoice/:token/detail
+/half-blade/pay-invoice/transfer-requirements
+/half-blade/payment-request
+/half-blade/team-access-share
+/identity-verification
+/in-person-card-payment/:token
+/intro
+/invoices
+/join-found
+/link-bank-account
+/link-invoice-to-pay
+/link-payment-request-to-pay
+/modal/1099-bulk-export-sent
+/modal/1099-e-file-accepted
+/modal/1099-e-file-submitted
+/modal/:modal_id
+/modal/:modal_id+
+/modal/activity-import-hub
+/modal/activity-tags/:token
+/modal/activity-tags/new-activity
+/modal/activity/:token
+/modal/business-type
+/modal/business/:businessId/:modal_id
+/modal/closed-account-1099-export
+/modal/closed-account-activity-export
+/modal/closed-account-tax-packet
+/modal/edit-tag/:token
+/modal/invoice-upsell
+/modal/kyc-renewal
+/modal/link-via-account-routing
+/modal/recipient-1099
+/modal/statements
+/modal/subscription/details
+/modal/tags-ftux
+/modal/tax-profile
+/modal/tax-settings
+/modal/tax-settings/*
+/modal/taxes/mileage
+/onboarding
+/onboarding/taxes/profile
+/password-reset/:token?
+/pay-invoice
+/paying/invoice
+/paying/invoice/:token
+/payment-request
+/payment-request/:token
+/payment-request/new
+/payment-request/stripe
+/payments/list
+/persona-redirect
+/register
+/register/
+/replace-card
+/settings
+/suggest-mobile-splash
+/tax-payment
+/tax-payment/federal
+/tax-payment/federal/mark-as-paid
+/tax-payment/federal/pay
+/tax-payment/history
+/tax-payment/history/add
+/tax-payment/spouse-details
+/tax-payment/state
+/tax-payment/state/mark-as-paid
+/taxes
+/taxes/mileage
+/taxes/packet/:year?
+/three-ds-review
+/transaction-review
+/verify
+accountant/business/:businessId/modal/activity-import-hub
+${g}${z.ADD_SERVICE_FEE}
+${g}${z.CREATE_CONTACT}
+${g}${z.DISCOUNT}
+${g}${z.DUE_DATE}
+${g}${z.EDIT_ATTACHMENT}
+${g}${z.EDIT_AUTO_REMINDERS}
+${g}${z.EDIT_CONTACT}
+${g}${z.EDIT_PAYMENT_METHODS}
+${g}${z.EDIT_SERVICE_FEE}
+${g}${z.END_DATE}
+${g}${z.FREQUENCY}
+${g}${z.ID}
+${g}${z.LINE_ITEM}
+${g}${z.NOTE}
+${g}${z.PAYMENT_METHOD}
+${g}${z.RECIPIENT}
+${g}${z.REVIEW}
+${g}${z.SEARCH_LINE_ITEMS}
+${g}${z.SEND_DATE}
+${g}${z.UPDATE_PAYMENT_METHOD}
+${i(bT.AUTO_INSURANCE_LIST)}/${e.carrier.toLowerCase()}
+${P.RECIPIENT_EDIT}/:token?
+${r}${cl.ADD_SERVICE_FEE}
+${r}${cl.ATTACHMENT_DETAIL}
+${r}${cl.ATTACHMENT}
+${r}${cl.BUSINESS_PROFILE}
+${r}${cl.DISCOUNT}
+${r}${cl.DUE_DATE}
+${r}${cl.EDIT_AUTO_REMINDERS}
+${r}${cl.EDIT_SERVICE_FEE}
+${r}${cl.END_DATE}
+${r}${cl.FREQUENCY}
+${r}${cl.ID}
+${r}${cl.LINE_ITEM}
+${r}${cl.NOTE}
+${r}${cl.PAYMENT_METHOD_DETAIL}
+${r}${cl.PAYMENT_METHOD}
+${r}${cl.PREVIEW}
+${r}${cl.SEARCH_LINE_ITEMS}
+${r}${cl.SEND_DATE}
+${V.F2F_OVERVIEW}/:token
