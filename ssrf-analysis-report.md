@@ -1,426 +1,310 @@
-# SSRF Vulnerability Analysis Report — Ory Kratos
+# SSRF Vulnerability Analysis Report: Ory Keto
 
+**Project:** Ory Keto (Zanzibar-based authorization service)  
+**Location:** `/workspace/ory-repos/keto/`  
 **Date:** 2026-03-28  
-**Project:** Ory Kratos (Identity Management Service)  
-**Path:** `/workspace/ory-repos/kratos/`  
-**Language:** Go  
-**Analysis Type:** Static Source Code Analysis  
+**Scope:** Static source code analysis for Server-Side Request Forgery (SSRF)
 
 ---
 
 ## Executive Summary
 
-Ory Kratos has a **well-engineered SSRF mitigation framework** built into its HTTP client infrastructure. The primary defense is a configurable private-IP blocking mechanism (`clients.http.disallow_private_ip_ranges`) that uses the `code.dny.dev/ssrf` library at the transport/dialer level. When enabled, this blocks outbound connections to RFC 1918, loopback, and link-local addresses.
-
-However, the protection is **opt-in (disabled by default)**, and there are several attack surfaces where admin-controlled or configuration-controlled URLs flow into backend HTTP requests. A few specific patterns present higher risk depending on deployment context.
+Ory Keto has a **moderate SSRF attack surface** primarily concentrated in its **namespace configuration loading** subsystem, which can fetch OPL (Ory Permission Language) files from HTTP/HTTPS URLs. The project includes built-in SSRF mitigation infrastructure (`code.dny.dev/ssrf` library, private IP blocking) but this protection is **disabled by default** (`disallow_private_ip_ranges: false`). The core API handlers (check, expand, read, write relation tuples) do **not** accept URL-like parameters and are not directly exploitable for SSRF. Most HTTP client usage in the codebase is configuration-driven (admin-only) rather than user-input-driven.
 
 ---
 
-## SSRF Mitigation Infrastructure
+## Finding 1: OPL Namespace Configuration Fetches Remote URLs (PRIMARY FINDING)
 
-### 1. Transport-Level SSRF Protection (Core Defense)
+### File Path & Lines
+- `internal/driver/config/opl_config_namespace_watcher.go` — lines 48–91
+- `internal/driver/config/provider.go` — lines 239–249, 325–337, 347–374
 
-**File:** `oryx/httpx/ssrf.go` (lines 1–134)
+### Endpoint/Function
+`newOPLConfigWatcher()` → called from `Config.NamespaceManager()` → triggered at startup and on config change.
 
-The primary SSRF defense operates at the `net.Dialer.Control` level using the `code.dny.dev/ssrf` library. Two transport variants are initialized:
+### Parameter
+`namespaces.location` configuration key (string, accepts `http://`, `https://`, `file://`, `base64://` schemes).
 
-- `prohibitInternalAllowIPv6` — blocks connections to private/loopback/link-local IPs
-- `allowInternalAllowIPv6` — allows all connections (including internal IPs)
+### Observation
+When the Keto configuration specifies `namespaces` as a map with a `location` key, the value is passed to `newOPLConfigWatcher()`, which:
 
-These are used by `noInternalIPRoundTripper` which selects the appropriate transport based on a glob-matched exception list.
+1. Parses the URL scheme (`opl_config_namespace_watcher.go:56–61`)
+2. For `http`/`https` schemes, calls `c.Fetcher().FetchContext(ctx, target)` (`opl_config_namespace_watcher.go:77`)
+3. `Config.Fetcher()` creates a `fetcher.Fetcher` that makes an HTTP GET request to the provided URL (`provider.go:239–249`)
+4. The fetcher uses `httpx.NewResilientClient()` which, by default, does **not** block private/internal IP ranges
 
-**Strengths:**
-- Protection at the TCP dial level means DNS rebinding attacks are mitigated (IP is checked at connect time, not just at URL parse time).
-- Covers all HTTP methods (GET, POST, etc.) uniformly.
-- Exception URLs use glob matching for flexibility.
+The configuration example:
+```yaml
+namespaces:
+  location: https://attacker.example.com/opl.ts
+```
 
-**Weaknesses/Notes:**
-- The code itself notes the TOCTOU concern for DNS: "A malicious actor could easily update the DNS record post validation to point to an internal IP" (`oryx/httpx/private_ip_validator.go`, line 25). However, the transport-level `ssrf.Safe` dialer in `ssrf.go` mitigates this since it checks at dial time.
-
-### 2. Global HTTP Client with Configurable IP Blocking
-
-**File:** `driver/registry_default.go` (lines 784–801)
-
+The `Fetcher()` method conditionally enables SSRF protection only if `clients.http.disallow_private_ip_ranges` is `true`:
 ```go
-func (m *RegistryDefault) HTTPClient(_ context.Context, opts ...httpx.ResilientOptions) *retryablehttp.Client {
-    // ...
-    if m.Config().ClientHTTPNoPrivateIPRanges(contextx.RootContext) {
-        opts = append(opts,
-            httpx.ResilientClientDisallowInternalIPs(),
-            httpx.ResilientClientAllowInternalIPRequestsTo(m.Config().ClientHTTPPrivateIPExceptionURLs(contextx.RootContext)...),
-        )
+func (k *Config) Fetcher() *fetcher.Fetcher {
+    opts := []httpx.ResilientOptions{}
+    if k.p.Bool("clients.http.disallow_private_ip_ranges") {
+        opts = append(opts, httpx.ResilientClientDisallowInternalIPs())
     }
-    return httpx.NewResilientClient(opts...)
+    return fetcher.NewFetcher(
+        fetcher.WithClient(httpx.NewResilientClient(opts...)),
+    )
 }
 ```
 
-**Configuration keys:**
-- `clients.http.disallow_private_ip_ranges` (boolean, **default: false**)
-- `clients.http.private_ip_exception_urls` (string array of glob patterns)
+### Risk Level
+**Possible** — Configuration-driven, not API-driven.
 
-**Risk:** The SSRF protection is **disabled by default**. Deployments that do not explicitly set `disallow_private_ip_ranges: true` have no transport-level SSRF protection on outbound HTTP requests.
-
-### 3. Redirect URL Allowlisting
-
-**File:** `x/redir/secure_redirect.go` (lines 105–149)
-
-Self-service flow redirects use an allowlist mechanism that checks scheme, host (with wildcard support), and path prefix. This prevents open-redirect attacks but is not an SSRF concern since the redirect URL is returned to the user's browser, not fetched server-side.
+### Reasoning
+This is a configuration-time SSRF vector. The `namespaces.location` field is set in the Keto configuration file (YAML/JSON/TOML), which is typically controlled by an administrator. It is **not** exposed via any REST or gRPC API endpoint. However:
+- If configuration is managed by an orchestration system that accepts user input (e.g., a multi-tenant platform where tenants can configure their own Keto instance), this becomes exploitable.
+- The `disallow_private_ip_ranges` config defaults to `false` (confirmed in `embedx/config.schema.json:444`), meaning even private/internal IPs are reachable by default.
+- The test at `internal/driver/config/provider_test.go:226–232` explicitly tests that HTTP URLs work and that private IPs are only blocked when `disallow_private_ip_ranges: true`.
 
 ---
 
-## Findings by Attack Surface
+## Finding 2: Generic Fetcher Library Supports Remote URL Fetching
+
+### File Path & Lines
+- `oryx/fetcher/fetcher.go` — lines 97–157
+- `oryx/osx/file.go` — lines 148–189
+
+### Endpoint/Function
+`fetcher.Fetcher.FetchBytes()`, `fetcher.Fetcher.fetchRemote()`, `osx.ReadFileFromAllSources()`
+
+### Parameter
+`source` string parameter accepting `http://`, `https://`, `file://`, `base64://` schemes.
+
+### Observation
+The `fetcher` package (`oryx/fetcher/fetcher.go`) is a general-purpose file/URL fetcher used across the Ory ecosystem. It:
+1. Accepts any URL starting with `http://` or `https://` (`fetcher.go:99`)
+2. Creates an HTTP GET request to the URL (`fetcher.go:131`)
+3. Returns the full response body (`fetcher.go:156`)
+4. Has an optional `WithMaxHTTPMaxBytes` limit but no built-in URL validation or IP filtering
+
+Similarly, `osx.ReadFileFromAllSources()` (`osx/file.go:144`) supports HTTP fetching via `o.hc.Get(parsed.String())` at line 179.
+
+Neither of these libraries performs any SSRF mitigation on its own — they rely on the caller to provide a properly configured HTTP client with SSRF protections.
+
+### Risk Level
+**Possible** — Library-level concern; risk depends on how callers configure the HTTP client.
+
+### Reasoning
+The fetcher library is a building block. In Keto, it is called from `Config.Fetcher()` which conditionally adds IP restriction. However, the default is permissive. If the fetcher is reused in other contexts (e.g., new features added to Keto) without configuring private IP blocking, SSRF would be possible.
 
 ---
 
-### Finding 1: Webhook URL — Admin-Configured, Server-Side Fetch
+## Finding 3: SSRF Protection Exists but Is Disabled by Default
 
-**Files:**
-- `selfservice/hook/web_hook.go` (lines 302–440)
-- `request/builder.go` (lines 72–111)
-- `request/config.go` (lines 19–33)
+### File Path & Lines
+- `oryx/httpx/ssrf.go` — lines 1–133
+- `oryx/httpx/resilient_client.go` — lines 68–71, 88–114
+- `embedx/config.schema.json` — lines 440–445
 
-**Endpoint/Function:** `WebHook.execute()` → `request.NewBuilder()` → `httpClient.Do(req)`
+### Endpoint/Function
+`httpx.NewResilientClient()` with `ResilientClientDisallowInternalIPs()` option.
 
-**Parameter:** `Config.URL` field — configured via `selfservice.flows.*.hooks[].config.url` in Kratos configuration.
+### Parameter
+`clients.http.disallow_private_ip_ranges` configuration key.
 
-**Observation:**  
-The webhook URL is taken from `request.Config.URL` (set via admin configuration/API) and used directly to construct an HTTP request at line 86 of `request/builder.go`:
-```go
-r, err := retryablehttp.NewRequest(c.Method, c.URL, nil)
-```
-The request is then executed via `httpClient.Do(req)` (line 390 of `web_hook.go`). The HTTP client used is the global `deps.HTTPClient(ctx)` which respects `disallow_private_ip_ranges` when configured.
+### Observation
+Keto includes a sophisticated SSRF mitigation system:
+1. `oryx/httpx/ssrf.go` implements `noInternalIPRoundTripper` using the `code.dny.dev/ssrf` library
+2. It blocks connections to private IPv4 ranges (10.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16) and private IPv6 ranges
+3. The protection is activated by calling `ResilientClientDisallowInternalIPs()`
+4. However, the `disallow_private_ip_ranges` config key defaults to **`false`**:
+   ```json
+   "disallow_private_ip_ranges": {
+     "type": "boolean",
+     "default": false
+   }
+   ```
 
-**Risk Level:** Possible  
-**Reasoning:** The webhook URL is admin-configured, not user-controllable in standard flows. However, in multi-tenant or delegated-admin scenarios, an admin could set a webhook URL pointing to internal services (cloud metadata endpoints, internal APIs). SSRF protection depends on `disallow_private_ip_ranges` being enabled. The webhook body can contain user data (identity, flow data), which could leak sensitive info to attacker-controlled endpoints.
+Additionally, the `noInternalIPRoundTripper` supports an exception list (`internalIPExceptions`) using glob-matching, allowing specific internal URLs to be whitelisted even when protection is enabled.
 
----
+### Risk Level
+**Possible** — The mitigation infrastructure exists but is opt-in.
 
-### Finding 2: Webhook/Request TemplateURI — Jsonnet Template Fetching
-
-**Files:**
-- `request/builder.go` (lines 283–307)
-- `oryx/fetcher/fetcher.go` (lines 87–157)
-
-**Endpoint/Function:** `Builder.readTemplate()` → `fetcher.FetchContext()` → `fetchRemote()`
-
-**Parameter:** `Config.TemplateURI` (configured as `body` in webhook config JSON)
-
-**Observation:**  
-The Jsonnet template URI is fetched via the `Fetcher` which supports `http://`, `https://`, `file://`, and `base64://` schemes. When the scheme is `http(s)://`, it makes an outbound HTTP GET request:
-```go
-req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, source, nil)
-res, err := f.hc.Do(req)
-```
-The HTTP client is the global `deps.HTTPClient(ctx)`, so SSRF protection applies when enabled. The fetcher has caching, so after the first fetch, subsequent requests use cache.
-
-**Risk Level:** Possible  
-**Reasoning:** The template URI is admin-configured. If an admin sets it to an internal URL, the server will fetch it. The `file://` scheme also allows reading local files. Since this is configuration-driven (not user input), the risk is limited to admin-level SSRF. When `disallow_private_ip_ranges` is enabled, HTTP fetches to private IPs are blocked, but `file://` reads are not affected by this control.
+### Reasoning
+This is a defense-in-depth configuration issue. Organizations that deploy Keto without explicitly setting `disallow_private_ip_ranges: true` leave SSRF protections disabled. The SSRF library itself is robust (it operates at the TCP dial level via `net.Dialer.Control`, preventing TOCTOU DNS rebinding attacks), but only when enabled.
 
 ---
 
-### Finding 3: OIDC Provider IssuerURL — Admin-Configured, Server-Side Discovery
+## Finding 4: Tracing Configuration Accepts External Server URLs
 
-**Files:**
-- `selfservice/strategy/oidc/provider_generic_oidc.go` (lines 51–59)
-- `selfservice/strategy/oidc/provider_auth0.go` (lines 46–69, 76–125)
-- `selfservice/strategy/oidc/provider_config.go` (lines 37–175)
+### File Path & Lines
+- `oryx/otelx/otlp.go` — lines 21–68 (`SetupOTLP`)
+- `oryx/otelx/jaeger.go` — lines 30–88 (`SetupJaeger`)
+- `oryx/otelx/zipkin.go` — lines 15–17 (`SetupZipkin`)
+- `oryx/otelx/config.go` — lines 12–42 (config structs)
 
-**Endpoint/Function:** `ProviderGenericOIDC.provider()` → `gooidc.NewProvider()`, `Claims()` → `UserInfo()`
+### Endpoint/Function
+`SetupOTLP()`, `SetupJaeger()`, `SetupZipkin()` — called at startup.
 
-**Parameter:** `Configuration.IssuerURL` — configured via `selfservice.methods.oidc.config.providers[].issuer_url`
+### Parameter
+- `tracing.providers.otlp.server_url`
+- `tracing.providers.jaeger.local_agent_address`
+- `tracing.providers.jaeger.sampling.server_url`
+- `tracing.providers.zipkin.server_url`
 
-**Observation:**  
-When a generic OIDC provider is configured, the `IssuerURL` is used to perform OpenID Connect Discovery (fetching `/.well-known/openid-configuration`) and subsequently fetching JWKS, token endpoints, and userinfo endpoints. All these are server-side HTTP requests.
+### Observation
+Tracing configuration allows specifying external endpoints where trace spans are sent:
+- **OTLP**: `otlptracehttp.WithEndpoint(c.Providers.OTLP.ServerURL)` — sends HTTP requests to the configured endpoint
+- **Jaeger**: `jaeger.WithAgentHost(host), jaeger.WithAgentPort(port)` — sends UDP packets to the configured agent; additionally `jaegerremote.WithSamplingServerURL(samplingServerURL)` makes HTTP requests
+- **Zipkin**: `zipkin.New(c.Providers.Zipkin.ServerURL)` — sends HTTP requests to the Zipkin endpoint
 
-For Auth0 provider, the issuer URL is used to construct `{issuer}/authorize`, `{issuer}/oauth/token`, and `{issuer}/userinfo` URLs.
+None of these use the `disallow_private_ip_ranges` protection. They use their respective library clients directly, not the Keto-configured resilient HTTP client.
 
-The HTTP client used is `g.reg.HTTPClient(ctx)` (via `gooidc.ClientContext`), which respects SSRF protections when enabled.
+### Risk Level
+**Possible** — Configuration-driven, admin-only, but no IP validation applied.
 
-**Risk Level:** Possible  
-**Reasoning:** The issuer URL is admin-configured. Tests in `provider_private_net_test.go` explicitly verify that when `disallow_private_ip_ranges` is true, private IPs in issuer URLs are blocked. Without this config, an admin could point issuer URLs to internal services. The test coverage for this SSRF scenario is good.
-
----
-
-### Finding 4: OIDC Claims from UserInfo Endpoint
-
-**Files:**
-- `selfservice/strategy/oidc/provider_generic_oidc.go` (lines 132–182)
-- Various provider files: `provider_auth0.go`, `provider_facebook.go`, `provider_salesforce.go`, `provider_gitlab.go`, etc.
-
-**Endpoint/Function:** `Claims()` methods on each provider
-
-**Parameter:** The userinfo URL is derived from OIDC discovery or constructed from `IssuerURL`.
-
-**Observation:**  
-After OAuth2 token exchange, providers fetch user claims either from the ID token (local verification) or from userinfo endpoints (server-side HTTP request). Providers like Auth0, Facebook, Salesforce, GitLab, VK, Yandex, etc., all make outbound HTTP calls to fetch user data.
-
-For generic OIDC providers, the userinfo URL comes from the discovery document (which was fetched from the issuer URL). For specific providers like Facebook, URLs are hardcoded (`https://graph.facebook.com/me`).
-
-All use `g.reg.HTTPClient(ctx)` which respects SSRF controls.
-
-**Risk Level:** Possible (for generic OIDC), Low (for hardcoded providers)  
-**Reasoning:** For hardcoded providers (Facebook, Google, etc.), the URLs are fixed and public — no SSRF risk. For the generic OIDC provider, the userinfo URL is derived from the OIDC discovery document at the admin-configured issuer URL. If an attacker controls a malicious OIDC issuer, they could serve a discovery document pointing the userinfo endpoint to an internal IP. However: (a) the admin must configure this issuer, and (b) SSRF protection at the transport level blocks internal IPs when enabled.
+### Reasoning
+If an attacker gains control of the Keto configuration (e.g., through a config injection vulnerability in a management plane), they could direct tracing data to internal services. The Jaeger sampling server URL is particularly notable because it causes Keto to make periodic HTTP requests to fetch sampling strategies. However, this is a configuration-only vector with no API exposure.
 
 ---
 
-### Finding 5: OIDC Mapper URL — Jsonnet Snippet Fetching
+## Finding 5: JWK Fetcher Can Retrieve Keys from Remote URLs
 
-**File:** `selfservice/strategy/oidc/strategy_registration.go` (lines 390–395)
+### File Path & Lines
+- `oryx/jwksx/fetcher.go` — lines 28–74 (deprecated `Fetcher`)
+- `oryx/jwksx/fetcher_v2.go` — lines 80–169 (`FetcherNext`)
 
-**Endpoint/Function:** `Strategy.EvaluateClaimsMapper()` → `fetcher.FetchContext()`
+### Endpoint/Function
+`jwksx.Fetcher.GetKey()`, `jwksx.FetcherNext.ResolveKeyFromLocations()`
 
-**Parameter:** `provider.Config().Mapper` — configured via `selfservice.methods.oidc.config.providers[].mapper_url`
+### Parameter
+`remote` (string URL) for v1, `locations` (string slice of URLs) for v2.
 
-**Observation:**  
-The mapper URL (Jsonnet code for mapping OIDC claims to identity traits) supports `http://`, `https://`, `file://`, and `base64://` schemes. When HTTP is used, the server fetches the Jsonnet code from the specified URL.
+### Observation
+The JWK fetcher library fetches JSON Web Key Sets from remote URLs:
+- **v1 (deprecated)**: Uses `http.DefaultClient.Get(f.remote)` with no URL validation (`fetcher.go:47`)
+- **v2**: Uses `fetcher.NewFetcher()` to fetch from locations, which supports `http://`, `https://`, `file://`, and `base64://` schemes (`fetcher_v2.go:154`)
 
-**Risk Level:** Possible  
-**Reasoning:** Admin-configured URL. Same fetcher infrastructure with SSRF protection when enabled. The `file://` scheme allows reading local files which is by design for file-based configurations but could be a concern in shared hosting environments.
+In v2, an optional `WithHTTPClient` can be passed to use a configured client, but if not provided, it defaults to `httpx.NewResilientClient()` without IP restrictions.
 
----
+### Risk Level
+**Possible** — Library code; risk depends on whether JWK fetching is used in Keto.
 
-### Finding 6: Identity Schema Loading from URLs
-
-**File:** `schema/handler.go` (lines 228–265)
-
-**Endpoint/Function:** `Handler.ReadSchema()` — called by `getIdentitySchema` (public API) and `getAll`
-
-**Parameter:** `Schema.URL` — configured via `identity.schemas[].url`
-
-**Observation:**  
-Identity schemas can be loaded from `file://`, `base64://`, or any other URL scheme (HTTP/HTTPS). For non-file/non-base64 schemes, the handler makes an HTTP GET request:
-```go
-req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil)
-resp, err := h.r.HTTPClient(ctx).Do(req)
-```
-The public API endpoint `/schemas/{id}` triggers this fetch. While the schema URLs are admin-configured, the fetch is triggered by any unauthenticated request to the public schemas endpoint.
-
-**Risk Level:** Possible  
-**Reasoning:** An admin configures schema URLs, but any public user can trigger the fetch by requesting `/schemas/{id}`. If an admin configures a schema URL pointing to an internal service, every public request for that schema would cause the server to fetch from that internal URL. SSRF protection via `disallow_private_ip_ranges` mitigates this for private IPs. The schema data is returned to the public caller, making this a potential data exfiltration vector if pointing to internal services.
+### Reasoning
+I found no direct usage of the JWK fetcher in Keto's core code (it appears to be part of the shared `ory/x` library). If Keto adds JWT-based authentication in the future using this library, the JWK URL source would need to be validated. Currently, this is a latent risk.
 
 ---
 
-### Finding 7: JSON Schema `$ref` Resolution
+## Finding 6: Reverse Proxy in Shared Library
 
-**Files:**
-- `schema/validator.go` (lines 41–79)
-- `driver/config/config.go` (lines 468–478)
-- `schema/schema.go` (lines 134–155)
+### File Path & Lines
+- `oryx/proxy/proxy.go` — lines 277–300
 
-**Endpoint/Function:** `jsonschema.LoadURL()` and `compiler.Compile()` (from `github.com/ory/jsonschema/v3`)
+### Endpoint/Function
+`proxy.New()` — creates an `httputil.ReverseProxy`.
 
-**Parameter:** `$ref` values within JSON schemas
+### Parameter
+`HostConfig.UpstreamHost`, `HostConfig.UpstreamScheme` — set by the `HostMapper` callback.
 
-**Observation:**  
-JSON schemas support `$ref` references which the JSON schema compiler resolves by loading URLs. The `jsonschema.LoadURL` function is used in multiple places. The config validator at `config.go:457` injects the SSRF-protected client into the context for the HTTP loader:
-```go
-if p.ClientHTTPNoPrivateIPRanges(ctx) {
-    opts = append(opts, httpx.ResilientClientDisallowInternalIPs())
-}
-ctx = context.WithValue(ctx, httploader.ContextKey, httpx.NewResilientClient(opts...))
-```
-This means schema `$ref` resolution respects SSRF protection when enabled.
+### Observation
+The proxy package implements a reverse proxy using `httputil.ReverseProxy`. The upstream target is determined by the `HostMapper` function provided at creation time. By default, it uses `http.DefaultTransport` (line 284).
 
-**Risk Level:** Possible  
-**Reasoning:** A malicious schema with `$ref` pointing to internal URLs could cause server-side fetches. Test `TestSchemaValidatorDisallowsInternalNetworkRequests` in `identity/validator_test.go` verifies this is blocked when SSRF protection is enabled. Without protection, `$ref` URLs could reach internal services.
+### Risk Level
+**Possible** — Library code; not used in Keto's core.
+
+### Reasoning
+The reverse proxy is part of the shared `ory/x` library and does not appear to be used by Keto's own server. It would be relevant if Keto were deployed behind this proxy component, but Keto's daemon (`internal/driver/daemon.go`) sets up its own HTTP servers directly without using this proxy. This is a latent risk if the proxy is adopted in the future.
 
 ---
 
-### Finding 8: Courier Template Remote Loading
+## Finding 7: DSN (Database Connection String) from Configuration
 
-**File:** `courier/template/load_template.go` (lines 79–105)
+### File Path & Lines
+- `internal/driver/config/provider.go` — lines 231–237
 
-**Endpoint/Function:** `loadRemoteTemplate()` → `fetcher.FetchContext()`
+### Endpoint/Function
+`Config.DSN()` — returns the database connection string.
 
-**Parameter:** Various `courier.templates.*.email.{subject,body.html,body.plaintext}` config values
+### Parameter
+`dsn` configuration key.
 
-**Observation:**  
-Email/SMS templates can be loaded from remote URLs. The template URL is configured via Kratos config (e.g., `courier.templates.recovery.valid.email.subject`). When set, the `loadRemoteTemplate()` function fetches the template:
-```go
-f := fetcher.NewFetcher(fetcher.WithClient(d.HTTPClient(ctx)))
-bb, err := f.FetchContext(ctx, url)
-```
-Uses `d.HTTPClient(ctx)` which respects SSRF protection when enabled.
+### Observation
+The DSN is read from configuration and used to connect to the database. It supports various SQL databases (PostgreSQL, MySQL, CockroachDB, SQLite). The DSN is not subject to SSRF protections (it's a direct database connection, not an HTTP request).
 
-**Risk Level:** Possible  
-**Reasoning:** Admin-configured URLs. Fetch happens when the courier sends a message (triggered by user actions like registration, recovery). Template content is not returned to the user, reducing data exfiltration risk. SSRF protection applies when enabled.
+### Risk Level
+**Possible** — Configuration-driven, standard database connection.
 
----
-
-### Finding 9: Courier HTTP Channel — Outbound Message Delivery
-
-**File:** `courier/http_channel.go` (lines 65–133)
-
-**Endpoint/Function:** `httpChannel.Dispatch()` → `request.NewBuilder()` → `httpClient.Do(req)`
-
-**Parameter:** `courier.http.request_config.url` and `courier.channels[].request_config.url`
-
-**Observation:**  
-When using HTTP-based courier delivery (instead of SMTP), Kratos sends messages via HTTP POST to a configured URL. The URL is from admin configuration and the request body contains message content (recipient, subject, body, template data).
-
-**Risk Level:** Possible  
-**Reasoning:** Admin-configured URL. Could be pointed at internal services. Sends sensitive message content (emails, SMS codes). SSRF protection applies when enabled.
+### Reasoning
+While a malicious DSN could potentially cause connections to internal database servers, this is a standard database configuration pattern and not typically classified as SSRF. The DSN is set via configuration files or environment variables, not via API input.
 
 ---
 
-### Finding 10: Password Migration Hook
+## Finding 8: httploader Import for JSON Schema Validation
 
-**File:** `selfservice/hook/password_migration_hook.go` (lines 48–139)
+### File Path & Lines
+- `internal/driver/config/provider.go` — line 15
 
-**Endpoint/Function:** `PasswordMigration.Execute()` → `httpClient.Do(whReq)`
+### Endpoint/Function
+Side-effect import: `_ "github.com/ory/jsonschema/v3/httploader"`
 
-**Parameter:** `selfservice.methods.password.config.migrate_hook.config.url`
+### Parameter
+JSON Schema `$ref` values pointing to remote URLs.
 
-**Observation:**  
-The password migration hook sends user credentials (identifier + password) to an external endpoint during login to check legacy password databases. The URL is admin-configured and the request body contains **plaintext passwords**.
+### Observation
+The `httploader` package is imported as a side effect, which registers an HTTP loader for the `jsonschema` validator. This allows JSON Schema `$ref` references to resolve remote schemas over HTTP. If any schema references external URLs, the validator will fetch them.
 
-**Risk Level:** Possible  
-**Reasoning:** Admin-configured URL. Sends plaintext passwords. If pointed at an attacker-controlled or internal service, credentials would be leaked. SSRF protection applies when enabled. The high sensitivity of the data (passwords) makes misconfiguration particularly dangerous.
+### Risk Level
+**Possible** — The schema files are embedded at build time, not user-supplied.
 
----
-
-### Finding 11: Session Tokenizer — JWKS URL and Claims Mapper URL
-
-**File:** `session/tokenizer.go` (lines 75–181)
-
-**Endpoint/Function:** `Tokenizer.TokenizeSession()` → `JWKSFetcher().ResolveKey()` and `fetcher.FetchContext()`
-
-**Parameters:**
-- `session.whoami.tokenizer.templates.<name>.jwks_url`
-- `session.whoami.tokenizer.templates.<name>.claims_mapper_url`
-
-**Observation:**  
-The session tokenizer fetches JWK sets from a configured URL to sign JWT tokens, and optionally fetches a Jsonnet claims mapper. Both use `s.r.HTTPClient(ctx)`.
-
-**Risk Level:** Possible  
-**Reasoning:** Admin-configured URLs. The JWKS URL is particularly sensitive — if an attacker could make the server fetch from a malicious endpoint, they could potentially influence JWT signing (though the key material validation would likely prevent signing with arbitrary keys). SSRF protection applies when enabled.
+### Reasoning
+The config schema (`embedx/config.schema.json`) uses `$ref` to reference `ory://tracing-config`, which is a registered in-memory schema, not an HTTP URL. However, the httploader capability means that if any schema were to reference an HTTP URL, it would be fetched without SSRF protection. This is a latent risk.
 
 ---
 
-### Finding 12: Hydra OAuth2 Provider Integration
+## Findings NOT Present (Negative Results)
 
-**File:** `hydra/hydra.go` (lines 66–172)
+### No SSRF in API Handlers
+The core REST/gRPC API endpoints do **not** accept URL parameters that trigger outbound requests:
+- `GET /relation-tuples` — accepts `namespace`, `object`, `relation`, `subject_id`, `subject_set.*` query params (all string identifiers, not URLs)
+- `PUT /admin/relation-tuples` — accepts JSON body with relation tuple fields (string identifiers)
+- `DELETE /admin/relation-tuples` — accepts query params for relation tuple fields
+- `PATCH /admin/relation-tuples` — accepts JSON body with patch deltas
+- `GET /relation-tuples/check` — accepts relation tuple query params
+- `POST /relation-tuples/check` — accepts JSON body with relation tuple
+- `POST /relation-tuples/batch/check` — accepts JSON body with tuple array
+- `GET /relation-tuples/expand` — accepts subject set query params
+- `GET /namespaces` — no parameters, returns configured namespaces
+- `POST /opl/syntax/check` — accepts OPL text in body, parses it locally (no URL fetching)
 
-**Endpoint/Function:** `DefaultHydra.getAdminAPIClient()` → API calls to Hydra
+### No Webhook/Callback Mechanisms
+Keto does not implement webhooks, callback URLs, or notification endpoints that could be SSRF vectors.
 
-**Parameter:** `oauth2_provider.url`
+### No User-Controllable URL Parameters in gRPC
+The gRPC service definitions (`proto/ory/keto/`) accept only typed relation tuple fields (strings for namespace, object, relation, subject). No URL-typed fields exist in the protobuf definitions.
 
-**Observation:**  
-Kratos integrates with Ory Hydra by making HTTP requests to the configured OAuth2 provider URL. The URL is used for accept-login and get-login-request operations. Uses `h.d.HTTPClient(ctx).StandardClient()`.
-
-**Risk Level:** Possible  
-**Reasoning:** Admin-configured URL to a trusted service (Hydra). In misconfigured deployments, could reach unintended internal services. SSRF protection applies when enabled.
-
----
-
-### Finding 13: HaveIBeenPwned API Host — Configurable DNS Name
-
-**File:** `selfservice/strategy/password/validator.go` (lines 119–167)
-
-**Endpoint/Function:** `DefaultPasswordValidator.fetch()` → `s.Client.Do(req)`
-
-**Parameter:** `selfservice.methods.password.config.haveibeenpwned_host` (default: `api.pwnedpasswords.com`)
-
-**Observation:**  
-The HIBP host is configurable via config. The validator constructs URLs like `https://{host}/range/{prefix}`. The HTTP client used is created with `httpx.NewResilientClient(httpx.ResilientClientWithConnectionTimeout(time.Second))` — **without** `ResilientClientDisallowInternalIPs()`.
-
-```go
-Client: httpx.NewResilientClient(
-    httpx.ResilientClientWithConnectionTimeout(time.Second),
-),
-```
-
-This client does **not** use the global registry's `HTTPClient()` and does **not** inherit the `disallow_private_ip_ranges` setting.
-
-**Risk Level:** Likely  
-**Reasoning:** The password validator creates its own HTTP client that bypasses the global SSRF protection. If an admin sets `haveibeenpwned_host` to an internal hostname/IP, the server will connect to it, sending password hash prefixes. This is a higher risk than other findings because: (1) the SSRF mitigation is bypassed, (2) the data sent (password hash prefixes) is sensitive, and (3) the request is triggered by any user during password-based registration or login. However, the parameter is only admin-configurable, not user-controllable.
-
----
-
-### Finding 14: Reverse Proxy in oryx/proxy Package
-
-**File:** `oryx/proxy/proxy.go` (lines 277–300)
-
-**Endpoint/Function:** `proxy.New()` → `httputil.ReverseProxy{}`
-
-**Parameter:** `HostConfig.UpstreamHost` and `HostConfig.UpstreamScheme` (determined by `HostMapper`)
-
-**Observation:**  
-The proxy package creates an `httputil.ReverseProxy` that forwards requests to upstream hosts. The upstream is determined by the `HostMapper` function provided at construction time. The default transport is `http.DefaultTransport` with no SSRF protection.
-
-**Risk Level:** Possible  
-**Reasoning:** This is a library/utility package in `oryx/`. Whether it represents an SSRF risk depends on how `HostMapper` is implemented by callers. The proxy itself has no built-in SSRF mitigation. If used in Kratos (or related Ory services) with user-influenced host mapping, it could be an SSRF vector. Within the Kratos codebase itself, this proxy is not directly used in the main application.
-
----
-
-### Finding 15: `osx.ReadFileFromAllSources` — File and HTTP Fetcher
-
-**File:** `oryx/osx/file.go` (lines 144–221)
-
-**Endpoint/Function:** `ReadFileFromAllSources()` / `readFile()`
-
-**Parameter:** `source` string
-
-**Observation:**  
-This utility function reads from `file://`, `http://`, `https://`, and `base64://` schemes. The HTTP client defaults to `httpx.NewResilientClient()` without SSRF protection unless a custom client is injected via `WithHTTPClient()`.
-
-**Risk Level:** Possible  
-**Reasoning:** This is a utility function. SSRF risk depends on whether the `source` parameter can be influenced by users and whether callers inject an SSRF-protected client. The default client has no SSRF protection.
+### OPL Evaluation Does Not Fetch External Resources
+The OPL parser (`schema/parser.go`) is a pure in-memory parser. OPL files are loaded once (at config time) and then parsed locally. OPL evaluation at check/expand time does not trigger network requests.
 
 ---
 
 ## Summary Table
 
-| # | Component | File | Parameter Source | Data Sensitivity | SSRF Protection | Risk Level |
-|---|-----------|------|-----------------|------------------|-----------------|------------|
-| 1 | Webhook URL | `selfservice/hook/web_hook.go` | Admin config | Flow/identity data | Yes (when enabled) | Possible |
-| 2 | Webhook Template URI | `request/builder.go` | Admin config | Template content | Yes (when enabled) | Possible |
-| 3 | OIDC Issuer URL | `strategy/oidc/provider_generic_oidc.go` | Admin config | OIDC discovery | Yes (when enabled) | Possible |
-| 4 | OIDC UserInfo | Various provider files | Derived from issuer | User claims | Yes (when enabled) | Possible |
-| 5 | OIDC Mapper URL | `strategy/oidc/strategy_registration.go` | Admin config | Jsonnet code | Yes (when enabled) | Possible |
-| 6 | Schema Loading | `schema/handler.go` | Admin config (public trigger) | Schema JSON | Yes (when enabled) | Possible |
-| 7 | Schema `$ref` | `schema/validator.go` | Schema content | Referenced schemas | Yes (when enabled) | Possible |
-| 8 | Courier Templates | `courier/template/load_template.go` | Admin config | Template content | Yes (when enabled) | Possible |
-| 9 | Courier HTTP Channel | `courier/http_channel.go` | Admin config | Message content | Yes (when enabled) | Possible |
-| 10 | Password Migration Hook | `selfservice/hook/password_migration_hook.go` | Admin config | **Plaintext passwords** | Yes (when enabled) | Possible |
-| 11 | Session Tokenizer | `session/tokenizer.go` | Admin config | JWKS / Jsonnet | Yes (when enabled) | Possible |
-| 12 | Hydra Integration | `hydra/hydra.go` | Admin config | OAuth2 data | Yes (when enabled) | Possible |
-| **13** | **HIBP Validator** | **`strategy/password/validator.go`** | **Admin config** | **Password hash prefixes** | **NO (bypassed)** | **Likely** |
-| 14 | Reverse Proxy | `oryx/proxy/proxy.go` | HostMapper function | Proxied requests | No (default transport) | Possible |
-| 15 | File/URL Reader | `oryx/osx/file.go` | Caller-provided | File/URL content | No (default client) | Possible |
-
----
-
-## Key Architectural Observations
-
-### 1. SSRF Protection is Opt-In
-The `clients.http.disallow_private_ip_ranges` config key defaults to `false`. Deployments must explicitly enable it. This is documented but represents a significant security gap for default installations.
-
-### 2. Transport-Level Protection is Strong When Enabled
-The `ssrf.Safe` dialer check at connect time is robust against DNS rebinding. The glob-based exception list adds flexibility without compromising security.
-
-### 3. Password Validator Bypasses Global SSRF Protection (Finding 13)
-`DefaultPasswordValidator` creates its own `httpx.NewResilientClient` without `ResilientClientDisallowInternalIPs()`. Even when `disallow_private_ip_ranges` is enabled globally, the HIBP client ignores it. This is the most notable gap.
-
-### 4. All Configuration-Driven URLs Share the Same Risk Profile
-Almost all SSRF vectors are admin-configured. If the admin is trusted and the configuration channel is secure, the risk is limited to misconfiguration. In multi-tenant deployments where tenant admins control configuration, the risk increases.
-
-### 5. `file://` Scheme Is Intentionally Supported
-Multiple components support `file://` URLs for reading local files. This is by design for file-based configurations but could be a local file disclosure risk in shared environments.
-
-### 6. Good Test Coverage for SSRF Scenarios
-Tests in `provider_private_net_test.go`, `identity/validator_test.go`, `web_hook_integration_test.go`, and `courier/sms_test.go` explicitly verify SSRF protections, demonstrating security awareness in the development process.
+| # | Location | Vector | User-Controllable? | SSRF Mitigation | Risk Level |
+|---|----------|--------|--------------------|-----------------| -----------|
+| 1 | `opl_config_namespace_watcher.go:48-91` | OPL config fetches HTTP URLs | Config-driven (admin) | Optional (`disallow_private_ip_ranges`, default=off) | **Possible** |
+| 2 | `oryx/fetcher/fetcher.go:97-157` | Generic URL fetcher library | Depends on caller | None built-in; relies on caller's HTTP client | **Possible** |
+| 3 | `oryx/httpx/ssrf.go` + `config.schema.json:440` | SSRF protection disabled by default | N/A (configuration) | Exists but default=`false` | **Possible** |
+| 4 | `oryx/otelx/otlp.go`, `jaeger.go`, `zipkin.go` | Tracing endpoints | Config-driven (admin) | None | **Possible** |
+| 5 | `oryx/jwksx/fetcher.go`, `fetcher_v2.go` | JWK remote fetching | Library code (unused in Keto core) | None by default | **Possible** |
+| 6 | `oryx/proxy/proxy.go:277-300` | Reverse proxy | Library code (unused in Keto core) | None | **Possible** |
+| 7 | `provider.go:231-237` | Database DSN | Config-driven (admin) | N/A (not HTTP) | **Possible** |
+| 8 | `provider.go:15` (httploader import) | JSON Schema HTTP loader | Build-time schemas | None | **Possible** |
 
 ---
 
 ## Recommendations
 
-1. **Consider enabling `disallow_private_ip_ranges` by default** — or at minimum, emit a prominent warning at startup when it is disabled.
+1. **Enable `disallow_private_ip_ranges` by default** — Change the default from `false` to `true` in `embedx/config.schema.json`. This is the single most impactful change to reduce SSRF risk.
 
-2. **Fix Finding 13:** The `DefaultPasswordValidator` should use the registry's `HTTPClient()` rather than creating its own unprotected client, so it inherits the global SSRF protection settings.
+2. **Apply IP restrictions to tracing clients** — The tracing setup functions (`SetupOTLP`, `SetupJaeger`, `SetupZipkin`) should use HTTP clients with the same SSRF protections as the fetcher.
 
-3. **Audit `file://` scheme support** in fetcher/osx components to ensure path traversal and sensitive file access is appropriately restricted.
+3. **Add URL scheme validation to namespace config** — Consider restricting `namespaces.location` to `file://` and `base64://` schemes only, or requiring explicit opt-in for `http://`/`https://` schemes.
 
-4. **Consider rate-limiting or caching schema fetches** triggered by the public `/schemas/{id}` endpoint to prevent abuse as an SSRF oracle.
+4. **Document SSRF hardening** — Add documentation advising operators to enable `clients.http.disallow_private_ip_ranges: true` in production deployments.
 
-5. **Document SSRF protection requirements** in deployment guides, especially for cloud/multi-tenant environments where metadata service access (169.254.169.254) is a concern.
+5. **Audit future feature additions** — Any new feature that uses the `fetcher` or `osx.ReadFileFromAllSources()` libraries should ensure the HTTP client is configured with `ResilientClientDisallowInternalIPs()`.
