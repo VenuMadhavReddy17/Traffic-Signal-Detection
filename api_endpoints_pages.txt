@@ -3,34 +3,34 @@
 # Note: Paths below are relative to the app origin (e.g. https://my.staging.found.com).
 # Some calls use absolute URLs with dynamic host (e.g. https://${subdomain}.found.com/api/...).
 
-## Relative /api paths (template literals as in source)
+## Relative /api paths (methods inferred from axios/fetch usage in bundle where possible)
 
-GET/POST  /api/accountant/client-resources-pdf?invite_code={invite_code}
+GET       /api/accountant/client-resources-pdf?invite_code={invite_code}   (window navigation; host from rp())
 POST      /api/book-entry/v2/set-reason
-GET       /api/bulk1099-export/{id}/download?jwt={jwt}
+GET       /api/bulk1099-export/{bulk1099ExportToken}/download?jwt={jwt}   (browser navigation via window.location.href after gated flow)
 POST      /api/business/email-direct-deposit-form
 POST      /api/business/email-signed-bank-letter
 POST      /api/change-email/v2
 POST      /api/change-password
-POST      /api/contractor-login/dismiss
+PUT       /api/contractor-login/dismiss
 POST      /api/email-security-code
 PUT       /api/invoice-recipient/link?invoice_jwt={jwt}
 POST      /api/invoice-recipient/v2/mark-as-paid?invoice_jwt={jwt}
 GET       /api/invoice/check-identifier?identifier={identifier}&estimate={boolean}
 POST      /api/linked-account/v2/link-via-account-routing
 POST      /api/onboarding/send-phone-verification-code
-POST      /api/plaid/link-token
+GET       /api/plaid/link-token
 POST      /api/plaid/v2/link-account
 GET       /api/public-invoice/{invoice_id}/attachment-url?invoice_attachment_id={id}
 GET       /api/public-invoice/{invoice_id}/download-attachment?attachment_jwt={jwt}
 GET       /api/public-invoice/{invoice_id}/pdf
 POST      /api/sms-security-code
 POST      /api/spend-incentive/opt-in
-GET       /api/stripe/redirect?return_to={url}   (also as https://{host}.found.com/api/stripe/redirect?return_to=...)
+GET       /api/stripe/redirect?return_to={url}   (also https://{subdomain}.found.com/api/stripe/redirect?return_to=...)
 POST      /api/upload
 POST      /api/v2/change-verified-phone
-POST      /api/v2/update-dob
-POST      /api/v2/update-name-ssn
+POST      /api/v2/update-dob   (passed as verificationUrl to verification helper; treat as sensitive PII update)
+POST      /api/v2/update-name-ssn   (passed as verificationUrl; SSN-related)
 POST      /api/verify-code
 
 ## External marketing/help URLs (not backend APIs; referenced in UI)
