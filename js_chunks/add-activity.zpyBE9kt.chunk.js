@@ -1,0 +1,1 @@
+import{o as e}from"./chunk.Bs6PmqsP.chunk.js";import{r as t}from"./preload-helper.DB7dPfpF.chunk.js";import{i as n}from"./function_helpers.TdOT4htE.chunk.js";var r=(0,e(t()).createContext)({catchupFlow:!1,setCatchupFlow:n,returnTo:`/`,setReturnTo:n});export{r as t};

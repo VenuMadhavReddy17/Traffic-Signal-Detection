@@ -1,0 +1,1 @@
+var e=function(e){return e.ALL_TIME=`all_time`,e.CALENDAR_MONTH=`calendar_month`,e.CALENDAR_WEEK=`calendar_week`,e.CALENDAR_DAY=`calendar_day`,e}({}),t={LIMITS:`/banking/limits`,LIMITS_UPGRADE:`/banking/limits/upgrade-info`,LIMITS_CATEGORY:`/banking/limits/:category`,LIMITS_CATEGORY_EDIT:`/banking/limits/:category/edit`};export{e as n,t};

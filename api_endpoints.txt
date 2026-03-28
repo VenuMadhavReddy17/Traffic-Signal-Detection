@@ -1,0 +1,82 @@
+# API endpoints extracted from:
+# - /workspace/js_chunks/*.chunk.js (18 downloaded chunks)
+# - /workspace/index_js.js
+# Source: https://my.staging.found.com/ static bundles
+# Extraction date: 2026-03-28
+#
+# Notes:
+# - {id} denotes path parameters (minified as ${e} etc. in source).
+# - Some routes use query strings (invoice_jwt, payment_request_jwt, business-contact search params).
+# - No GraphQL usage found in these files.
+# - Stripe Terminal in stripe-terminal chunk uses NativeApp bridge methods, not REST /api/ paths here.
+
+${window.origin}/api/redirect
+/api/business-contact
+/api/business-contact/bulk-search
+/api/business-contact/search
+/api/business-contact/{id}/bank-account
+/api/business-contact/{id}/mark-as-contractor
+/api/business-contact/{id}/mark-has-seen-contractor-promotion
+/api/business-contact/{id}/mark-has-seen-text-payment-prompt
+/api/business-contact/{id}/save-contractor-w9
+/api/business-contact/{id}/send-contractor-onboarding-tools
+/api/business-contact/{id}/send-contractor-setup
+/api/business-contact/{id}/share-1099
+/api/business-contact/{id}/unmark-as-contractor
+/api/change-password
+/api/check-password
+/api/contact/bulk-sync
+/api/contact/device-contacts
+/api/contractor/{id}/w9
+/api/custom-category
+/api/custom-category/v2
+/api/custom-category/v2/{existingCustomCategoryId}
+/api/custom-category/{id}
+/api/custom-category/{id}/activate
+/api/custom-category/{id}/deactivate
+/api/data/business-types
+/api/data/tax-rates
+/api/data/v2/business-types
+/api/data/v2/categories
+/api/debit-card/access-token
+/api/debit-card/activate
+/api/debit-card/create-virtual-card
+/api/debit-card/delete-card
+/api/debit-card/request-replacement-virtual
+/api/debit-card/update-international-transactions
+/api/debit-card/update-locked-state
+/api/debit-card/update-nickname
+/api/debit-card/update-pinned-card
+/api/debit-card/update-time-based-spend-limits
+/api/debit-card/v3/all
+/api/debit-card/v3/create-card
+/api/debit-card/v3/report-lost
+/api/debit-card/virtual-cards-limit
+/api/enroll-biometrics
+/api/index
+/api/invoice-recipient/create-business-contact-for-sender
+/api/legal-documents
+/api/logout
+/api/payment-request-recipient/create-business-contact-for-sender
+/api/peer-to-peer-payment-recipient/link
+/api/peer-to-peer-payment-recipient/v2/accept
+/api/peer-to-peer-payment-recipient/v2/dismiss
+/api/promotion-code/track-invite
+/api/register
+/api/reset-password
+/api/send-security-code
+/api/v2/business-contact
+/api/v2/business-contact/{id}
+/api/v2/business-contact/{id}/bank-account
+/api/v2/business-contact/{id}/contractor-jwt
+/api/vendor-rule
+/api/vendor-rule/activate
+/api/vendor-rule/async-add/{id}
+/api/vendor-rule/v2/{id}
+/api/verify-biometrics-secret
+/api/verify-register
+/api/verify-security-code
+
+# Query parameters (not separate paths):
+# - /api/invoice-recipient/create-business-contact-for-sender?invoice_jwt=<token>
+# - /api/payment-request-recipient/create-business-contact-for-sender?payment_request_jwt=<token>
