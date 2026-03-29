@@ -264,9 +264,9 @@ If this succeeds, it would retrieve an IMDSv2 token from the AWS metadata servic
 
 | # | Endpoint / Feature | Parameter(s) | Risk Level | Key Observation |
 |---|-------------------|-------------|------------|-----------------|
-| **1** | **Webhook Template Creation** | **`webhook_url`** | **Likely** | **CAPTURED: Accepts arbitrary external domains (including Burp Collaborator) without protocol prefix enforcement. User controls URL, method, body, and headers — full request control.** |
-| 2 | Webhook Template Headers | `webhook_headers` | **Likely** | User-controlled headers in server-side outbound requests enable IMDSv2 token theft and virtual host routing on internal services. |
-| 3 | Webhook Campaign-Level | `webhook_url` | **Likely** | Same mechanism via different endpoint (campaign configuration). |
+| **1** | **Webhook Template / Campaign** | **`webhook_url`** | **CONFIRMED** | **OOB interaction observed from Braze server to Burp Collaborator domain. Server makes HTTP requests to arbitrary user-supplied URLs. Zero input validation — localhost, cloud metadata, K8s API, all encoding bypasses accepted.** |
+| **2** | **Webhook Headers** | **`webhook_headers`** | **CONFIRMED** | **User-controlled headers pass through to server-side outbound request. Enables IMDSv2 token theft and GCP metadata access.** |
+| **3** | **Webhook Method/Body** | **`webhook_method`, `webhook_body`** | **CONFIRMED** | **Full control over HTTP method (GET/POST/PUT) and request body.** |
 | 4 | Connected Content | `{% connected_content %}` URL | **Likely** | Documented server-side fetch of user-supplied URLs. |
 | 5 | Push Icon/Image URLs | `icon_url`, `image_url` | **Possible** | May trigger server-side fetch for validation or caching. |
 | 6 | API/Integration URLs | `api_endpoint`, `api_url` | **Possible** | Integration setup with test/validate flows. |
