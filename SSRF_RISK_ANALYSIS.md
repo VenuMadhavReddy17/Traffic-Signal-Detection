@@ -169,7 +169,282 @@ The following safe, non-exploitative techniques can be used to confirm SSRF beha
 
 ---
 
-## 7. Disclaimer
+## 7. Step-by-Step Burp Suite Testing Guide
+
+Below is a sequential walkthrough for testing SSRF on the target using Burp Suite. Follow each step in order.
+
+---
+
+### Step 1 — Configure Browser Proxy
+
+1. Open Burp Suite (Community or Professional).
+2. Go to **Proxy → Proxy settings**.
+3. Confirm the proxy listener is running on `127.0.0.1:8080`.
+4. In your browser, set the HTTP/HTTPS proxy to `127.0.0.1:8080`.
+   - Firefox: Settings → Network Settings → Manual proxy → `127.0.0.1` port `8080` → check "Also use this proxy for HTTPS".
+   - Or use the FoxyProxy extension and create a Burp profile.
+5. Visit `http://burpsuite` in the browser and download + install the Burp CA certificate so HTTPS interception works without errors.
+
+---
+
+### Step 2 — Add Target to Scope
+
+1. In Burp, go to **Target → Scope settings**.
+2. Click **Add** under "Include in scope".
+3. Enter the target:
+
+```
+Host: bug-bounty-dashboard.k8s.tools-001.d-use-1.braze-dev.com
+Protocol: HTTPS
+Port: 443
+```
+
+4. Go to **Proxy → HTTP history** options and check **Show only in-scope items** to reduce noise.
+
+---
+
+### Step 3 — Browse the Settings Page and Capture Traffic
+
+1. In the proxied browser, navigate to:
+
+```
+https://bug-bounty-dashboard.k8s.tools-001.d-use-1.braze-dev.com/app_settings/app_settings/69c8d257629242005dba8746?locale=en
+```
+
+2. Log in if required.
+3. Let the page fully load.
+4. In Burp **Proxy → HTTP history**, you will now see all the requests the page made.
+5. Look for:
+   - The initial `GET` that loaded the page HTML.
+   - Any `XHR`/`fetch` API calls (often `GET` or `POST` to `/api/...` or `/app_settings/...` endpoints) that loaded the settings data.
+6. Click each request and inspect the **Response** body — this reveals the actual field names the application uses.
+
+---
+
+### Step 4 — Identify URL-Accepting Parameters
+
+1. On the settings page in the browser, look for any input fields that accept URLs — these might be labeled:
+   - Webhook URL / Callback URL
+   - Icon / Logo / Image URL
+   - API Endpoint
+   - Connected Content URL
+   - Feed / Import URL
+   - Redirect URI
+2. Also try submitting/saving the form (even without changes) and watch **HTTP history** for the `POST`/`PUT`/`PATCH` request.
+3. Click that save request in Burp and examine the **Request** body — note every parameter name and its value.
+4. Write down each parameter that contains or accepts a URL. These are your SSRF test candidates.
+
+---
+
+### Step 5 — Start Burp Collaborator
+
+1. Go to **Burp → Burp Collaborator client** (Professional edition).
+   - If using Community edition, use https://webhook.site or https://interact.sh instead — open it in a separate (non-proxied) browser tab and copy the unique URL.
+2. In Collaborator, click **Copy to clipboard** to get your unique collaborator subdomain, e.g.:
+
+```
+abc123xyz.burpcollaborator.net
+```
+
+3. Keep the Collaborator window open — you will poll it for interactions later.
+
+---
+
+### Step 6 — Send the Save Request to Repeater
+
+1. In **Proxy → HTTP history**, find the `POST`/`PUT`/`PATCH` request that saves settings (from Step 4).
+2. Right-click it → **Send to Repeater**.
+3. Switch to the **Repeater** tab. You now have the full request ready to modify and resend.
+
+---
+
+### Step 7 — Test the First URL Parameter
+
+1. In **Repeater**, locate the first URL parameter you identified (e.g., `webhook_url`).
+2. Replace its value with your Collaborator URL:
+
+```
+webhook_url=http://abc123xyz.burpcollaborator.net/test-webhook
+```
+
+3. Click **Send**.
+4. Note the response: status code, body, any error messages.
+5. Go to the **Collaborator** tab and click **Poll now**.
+6. Check if any DNS or HTTP interaction appeared.
+
+**What to record:**
+
+| Item | Value |
+|------|-------|
+| Parameter tested | `webhook_url` (or whatever the actual name is) |
+| Collaborator URL used | `http://abc123xyz.burpcollaborator.net/test-webhook` |
+| HTTP response code | e.g., `200`, `400`, `422` |
+| Response body notes | e.g., "success", "invalid URL", error message text |
+| Collaborator hit? | Yes / No |
+| Hit type | DNS only / HTTP GET / HTTP POST |
+| Source IP of hit | (from Collaborator details) |
+| User-Agent of hit | (from Collaborator details) |
+
+---
+
+### Step 8 — Repeat for Each URL Parameter
+
+1. Go back to **Repeater**.
+2. Use a **different** Collaborator subdomain path for each parameter so you can tell which parameter triggered a callback:
+
+```
+Parameter: webhook_url  → http://abc123xyz.burpcollaborator.net/ssrf-webhook
+Parameter: icon_url     → http://abc123xyz.burpcollaborator.net/ssrf-icon
+Parameter: api_url      → http://abc123xyz.burpcollaborator.net/ssrf-api
+Parameter: feed_url     → http://abc123xyz.burpcollaborator.net/ssrf-feed
+```
+
+3. For each parameter:
+   - Replace the value.
+   - Click **Send**.
+   - **Poll Collaborator** after each send.
+   - Record results in the table format above.
+
+---
+
+### Step 9 — Test for Blind SSRF with Timing
+
+For parameters that did NOT trigger a Collaborator hit but returned a slow or different response:
+
+1. In **Repeater**, set the URL parameter to a valid external URL (e.g., `http://example.com`).
+2. Click **Send** and note the response time (shown at bottom-right of Repeater).
+3. Now set the URL parameter to a non-routable IP that will cause a timeout:
+
+```
+http://10.255.255.1/
+```
+
+4. Click **Send** and note the response time.
+5. If the second request takes significantly longer (e.g., 5-30 seconds vs. < 1 second), the server is attempting to connect to the URL you provided — this confirms server-side fetching even without a Collaborator callback.
+
+---
+
+### Step 10 — Test Response Reflection (Full vs. Blind SSRF)
+
+For parameters that DID trigger a Collaborator hit:
+
+1. Set up a simple response on your collaborator or use a URL that returns known content (e.g., `http://abc123xyz.burpcollaborator.net` which returns a default page).
+2. Submit it in the parameter.
+3. Check:
+   - Does the application response contain any content fetched from your URL?
+   - Does the page display an image preview, a status message, or fetched data?
+4. If **yes** → this is a **full (reflected) SSRF** — the server returns the fetched content to you.
+5. If **no** → this is a **blind SSRF** — the server fetches the URL but does not return the content.
+
+---
+
+### Step 11 — Check for URL Validation / Allowlisting
+
+For each confirmed SSRF parameter, test what the application blocks:
+
+1. **Localhost:**
+
+```
+http://127.0.0.1/
+http://localhost/
+http://[::1]/
+```
+
+2. **Cloud metadata (AWS):**
+
+```
+http://169.254.169.254/latest/meta-data/
+```
+
+3. **Alternative representations:**
+
+```
+http://2130706433/              (decimal IP for 127.0.0.1)
+http://0x7f000001/              (hex IP for 127.0.0.1)
+http://017700000001/            (octal IP for 127.0.0.1)
+http://127.1/                   (short form)
+http://0/                       (resolves to 0.0.0.0)
+```
+
+4. **DNS rebinding (if you have a controlled domain):**
+
+```
+http://your-rebind-domain.com/  (resolves to internal IP after first lookup)
+```
+
+5. For each test, record whether the application:
+   - Accepts it (potential bypass)
+   - Rejects it with an error (note the error message — it reveals validation logic)
+   - Times out (server attempted the connection but it failed at network level)
+
+---
+
+### Step 12 — Use Intruder for Automated Parameter Scanning (Optional)
+
+If the settings form has many parameters and you want to test them all efficiently:
+
+1. In **Repeater**, right-click the request → **Send to Intruder**.
+2. Go to **Intruder → Positions**.
+3. Click **Clear §** to clear all markers.
+4. Highlight just the value of one URL parameter and click **Add §**.
+5. Go to **Intruder → Payloads**.
+6. Set payload type to **Simple list**.
+7. Add your Collaborator URLs and internal test URLs as payloads:
+
+```
+http://abc123xyz.burpcollaborator.net/intruder-test-1
+http://127.0.0.1/
+http://169.254.169.254/latest/meta-data/
+http://10.255.255.1/
+http://kubernetes.default.svc/
+```
+
+8. Click **Start attack**.
+9. After the attack finishes, review response codes, lengths, and times for anomalies.
+10. Poll Collaborator for any hits.
+
+---
+
+### Step 13 — Document Findings
+
+For each confirmed SSRF interaction, document using this template:
+
+```
+Endpoint:    POST /app_settings/app_settings/69c8d257629242005dba8746
+Parameter:   [actual parameter name]
+Observation: Server made an HTTP [GET/POST] request to the Collaborator
+             URL within [X] seconds of form submission.
+             Source IP: [IP from Collaborator].
+             User-Agent: [UA string from Collaborator].
+Risk Level:  Confirmed
+Reasoning:   The server-side application fetches the URL supplied in
+             the [parameter] field. This was verified by observing
+             an out-of-band HTTP interaction on a controlled domain.
+```
+
+---
+
+### Quick Reference — Order of Operations
+
+```
+ 1. Proxy setup          → Browser talks through Burp
+ 2. Scope the target     → Filter noise
+ 3. Browse & capture     → See real requests
+ 4. Find URL params      → Identify test candidates
+ 5. Start Collaborator   → Prepare OOB listener
+ 6. Send to Repeater     → Isolate the save request
+ 7. Test first param     → Collaborator URL in param, send, poll
+ 8. Test all params      → Unique path per param
+ 9. Timing test          → Non-routable IP vs. valid URL
+10. Reflection test      → Full SSRF vs. blind SSRF
+11. Validation test      → Localhost, metadata, bypasses
+12. Intruder (optional)  → Batch testing
+13. Document             → Write up findings
+```
+
+---
+
+## 8. Disclaimer
 
 This analysis is performed under authorized bug bounty testing scope. All findings are based on:
 - URL structure analysis
