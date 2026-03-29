@@ -1,0 +1,175 @@
+{
+  "oob_domain": "d74e689gvedeefgm7f1gr6gpor5z4ik5d.oast.live",
+  "interactions": [],
+  "trigger_results": [
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook_templates/69c8e1c02b6ccb005d77754f/test?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.258272
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook_templates/69c8e1c02b6ccb005d77754f/test_send?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.177488
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook_templates/69c8e1c02b6ccb005d77754f/send_test?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.315598
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook_templates/69c8e1c02b6ccb005d77754f/test?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.206654
+    },
+    {
+      "method": "GET",
+      "endpoint": "/engagement/webhook_templates/69c8e1c02b6ccb005d77754f/test?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 2.123479
+    },
+    {
+      "method": "GET",
+      "endpoint": "/engagement/webhook_templates/69c8e1c02b6ccb005d77754f/preview?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 2.203129
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook/test_send?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.060769
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhooks/test_send?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.067307
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook_campaigns/test_send?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.06163
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook/test_send?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.071024
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhooks/test?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.137551
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/campaigns/test_send?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.06522
+    },
+    {
+      "method": "POST",
+      "endpoint": "/messaging/webhook/send?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.231319
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/v1/messages/send?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.219199
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook_templates/test?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.069003
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhook/test_send?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.066811
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/webhooks/test_send?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.061291
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/campaigns?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.071106
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/connected_content/test?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.280864
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/test_connected_content?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.220869
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/preview?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.24111
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/messages/preview?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.281564
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/liquid_preview?app_group_id=69c8d257629242005dba8746",
+      "status": 301,
+      "body": "\n",
+      "elapsed": 1.210877
+    },
+    {
+      "method": "POST",
+      "endpoint": "/engagement/content_blocks/preview?app_group_id=69c8d257629242005dba8746",
+      "status": 401,
+      "body": "{\"error\":\"You need to sign in before continuing.\"}\n",
+      "elapsed": 0.066913
+    }
+  ],
+  "timestamp": "2026-03-29T08:32:02.275789+00:00"
+}
