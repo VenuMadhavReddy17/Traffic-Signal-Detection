@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=pentest-secret-key
+      - FLASK_DEBUG=0
+      - MAX_CONTENT_LENGTH=16777216
+    volumes:
+      - uploads:/tmp/uploads
+    restart: unless-stopped
+
+  pentest:
+    build: .
+    depends_on:
+      - app
+    environment:
+      - TARGET_URL=http://app:5000
+    command: >
+      bash -c "
+        echo 'Waiting for app to start...' &&
+        sleep 5 &&
+        bash pentest/run_all_scans.sh
+      "
+    volumes:
+      - ./pentest/reports:/app/pentest/reports
+
+volumes:
+  uploads:

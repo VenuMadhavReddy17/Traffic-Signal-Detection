@@ -1,0 +1,58 @@
+rules:
+  - id: flask-debug-mode
+    patterns:
+      - pattern: app.run(..., debug=True, ...)
+    message: Flask debug mode should be disabled in production
+    languages: [python]
+    severity: ERROR
+
+  - id: hardcoded-secret-key
+    patterns:
+      - pattern: SECRET_KEY = "..."
+    message: Secret key should not be hardcoded
+    languages: [python]
+    severity: ERROR
+
+  - id: ssrf-urllib
+    patterns:
+      - pattern: urllib.request.urlretrieve($URL, ...)
+    message: Potential SSRF - user-controlled URL passed to urlretrieve
+    languages: [python]
+    severity: ERROR
+
+  - id: path-traversal
+    patterns:
+      - pattern: send_from_directory(..., $FILENAME)
+    message: Ensure filename is properly sanitized to prevent path traversal
+    languages: [python]
+    severity: WARNING
+
+  - id: config-exposure
+    patterns:
+      - pattern: |
+          for $K, $V in app.config.items():
+              ...
+    message: Application config may be exposed to unauthorized users
+    languages: [python]
+    severity: ERROR
+
+  - id: unsafe-deserialization
+    patterns:
+      - pattern: pickle.loads(...)
+    message: Unsafe deserialization with pickle
+    languages: [python]
+    severity: ERROR
+
+  - id: command-injection
+    patterns:
+      - pattern: os.system($CMD)
+    message: Potential command injection via os.system
+    languages: [python]
+    severity: ERROR
+
+  - id: sql-injection
+    patterns:
+      - pattern: cursor.execute($QUERY % ...)
+    message: SQL injection via string formatting
+    languages: [python]
+    severity: ERROR

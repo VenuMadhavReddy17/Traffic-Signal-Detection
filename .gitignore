@@ -1,0 +1,32 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.env
+*.pyc
+*.pyo
+*.whl
+
+# Pentest reports (regenerated per run)
+pentest/reports/*.json
+pentest/reports/*.txt
+!pentest/reports/.gitkeep
+
+# Model weights (large files)
+models/*.weights
+models/*.conv.*
+
+# Uploads
+/tmp/uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

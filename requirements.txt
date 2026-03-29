@@ -1,0 +1,14 @@
+# Application
+flask==3.1.0
+gunicorn==23.0.0
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+Werkzeug==3.1.3
+
+# Security Testing / Pentest Tools
+bandit==1.8.3
+safety==3.2.14
+semgrep==1.103.0
+requests==2.32.3
+python-owasp-zap-v2.4==0.3.0
+sqlmap==1.8.12
