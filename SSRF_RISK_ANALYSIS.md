@@ -444,7 +444,144 @@ Reasoning:   The server-side application fetches the URL supplied in
 
 ---
 
-## 8. Disclaimer
+## 8. Endpoint Checklist for SSRF Testing
+
+The base URL for all endpoints below is:
+
+```
+https://bug-bounty-dashboard.k8s.tools-001.d-use-1.braze-dev.com
+```
+
+The app ID from the original URL is `69c8d257629242005dba8746`. Replace `{app_id}` with that value in each endpoint.
+
+---
+
+### 8.1 App Settings (Primary Target)
+
+These are the most likely SSRF surfaces — the settings page you already have access to.
+
+| # | Method | Endpoint | Parameters to Test | Why |
+|---|--------|----------|--------------------|-----|
+| 1 | `GET` | `/app_settings/app_settings/{app_id}?locale=en` | Read response body to discover all field names | Reconnaissance — reveals the actual parameter names the form uses |
+| 2 | `PUT` / `PATCH` | `/app_settings/app_settings/{app_id}` | `webhook_url`, `callback_url`, `postback_url` | Saving a webhook URL may trigger server-side validation ping |
+| 3 | `PUT` / `PATCH` | `/app_settings/app_settings/{app_id}` | `icon_url`, `image_url`, `logo_url`, `app_icon`, `favicon_url` | Image/icon fields — server may fetch for thumbnail/validation |
+| 4 | `PUT` / `PATCH` | `/app_settings/app_settings/{app_id}` | `api_url`, `api_endpoint`, `base_url`, `custom_endpoint` | Integration base URLs — server may test connectivity |
+| 5 | `PUT` / `PATCH` | `/app_settings/app_settings/{app_id}` | `redirect_url`, `redirect_uri`, `oauth_callback` | Redirect/OAuth config — possible server-side verification |
+| 6 | `PUT` / `PATCH` | `/app_settings/app_settings/{app_id}` | `feed_url`, `import_url`, `data_url`, `catalog_url` | Data import URLs — server fetches content from URL |
+
+---
+
+### 8.2 Webhook Management Endpoints
+
+Dashboard applications typically have dedicated webhook CRUD endpoints.
+
+| # | Method | Endpoint | Parameters to Test | Why |
+|---|--------|----------|--------------------|-----|
+| 7 | `POST` | `/app_settings/{app_id}/webhooks` | `url`, `endpoint`, `target_url` | Creating a new webhook — server may verify the URL on creation |
+| 8 | `PUT` | `/app_settings/{app_id}/webhooks/{webhook_id}` | `url`, `endpoint`, `target_url` | Updating a webhook URL |
+| 9 | `POST` | `/app_settings/{app_id}/webhooks/{webhook_id}/test` | (uses stored URL) | "Test webhook" button — sends a live request to the stored URL |
+| 10 | `POST` | `/app_settings/{app_id}/webhooks/test` | `url`, `target_url` | Ad-hoc webhook test before saving |
+
+---
+
+### 8.3 Integration / Connected App Endpoints
+
+| # | Method | Endpoint | Parameters to Test | Why |
+|---|--------|----------|--------------------|-----|
+| 11 | `POST` | `/app_settings/{app_id}/integrations` | `endpoint`, `base_url`, `api_url` | Adding a new third-party integration |
+| 12 | `PUT` | `/app_settings/{app_id}/integrations/{integration_id}` | `endpoint`, `base_url`, `api_url` | Updating an integration endpoint |
+| 13 | `POST` | `/app_settings/{app_id}/integrations/{integration_id}/test` | (uses stored URL) | "Test connection" — server makes request to the configured endpoint |
+
+---
+
+### 8.4 Connected Content / Dynamic Content Endpoints
+
+Braze's Connected Content feature makes server-side HTTP requests by design.
+
+| # | Method | Endpoint | Parameters to Test | Why |
+|---|--------|----------|--------------------|-----|
+| 14 | `POST` | `/app_settings/{app_id}/connected_content` | `url`, `content_url`, `api_endpoint` | Configuring a Connected Content source |
+| 15 | `POST` | `/app_settings/{app_id}/connected_content/test` | `url` | Testing a Connected Content URL — server fetches it immediately |
+| 16 | `POST` | `/app_settings/{app_id}/connected_content/preview` | `url` | Previewing content from an external URL |
+
+---
+
+### 8.5 Data Import / Export Endpoints
+
+| # | Method | Endpoint | Parameters to Test | Why |
+|---|--------|----------|--------------------|-----|
+| 17 | `POST` | `/app_settings/{app_id}/data_import` | `source_url`, `feed_url`, `csv_url`, `file_url` | Importing data from an external URL |
+| 18 | `POST` | `/app_settings/{app_id}/catalogs` | `feed_url`, `catalog_url`, `source_url` | Product catalog feed import |
+| 19 | `POST` | `/app_settings/{app_id}/export` | `destination_url`, `callback_url`, `webhook_url` | Export completion callback URL |
+
+---
+
+### 8.6 Branding / Media Endpoints
+
+| # | Method | Endpoint | Parameters to Test | Why |
+|---|--------|----------|--------------------|-----|
+| 20 | `POST` | `/app_settings/{app_id}/branding` | `logo_url`, `icon_url`, `image_url`, `banner_url` | Brand assets — server fetches/caches images |
+| 21 | `POST` | `/app_settings/{app_id}/media` | `url`, `source_url`, `media_url` | Media library — importing media from URL |
+| 22 | `POST` | `/app_settings/{app_id}/media/upload_from_url` | `url`, `source_url` | Direct URL-to-media import — server downloads the file |
+
+---
+
+### 8.7 Push Notification / Email Configuration
+
+| # | Method | Endpoint | Parameters to Test | Why |
+|---|--------|----------|--------------------|-----|
+| 23 | `PUT` | `/app_settings/{app_id}/push_settings` | `apns_endpoint`, `fcm_endpoint`, `callback_url` | Push provider endpoint configuration |
+| 24 | `PUT` | `/app_settings/{app_id}/email_settings` | `tracking_url`, `click_tracking_domain`, `unsubscribe_url`, `custom_footer_url` | Email settings — some may trigger server-side verification |
+| 25 | `POST` | `/app_settings/{app_id}/email_settings/verify_domain` | `domain`, `url` | Domain verification — server may fetch a verification file |
+
+---
+
+### 8.8 General API Endpoints
+
+| # | Method | Endpoint | Parameters to Test | Why |
+|---|--------|----------|--------------------|-----|
+| 26 | `POST` | `/api/v1/proxy` or `/api/proxy` | `url`, `target`, `endpoint` | If a proxy endpoint exists, it is a direct SSRF vector |
+| 27 | `POST` | `/api/v1/fetch` or `/api/fetch` | `url`, `uri`, `link` | Generic fetch endpoint |
+| 28 | `POST` | `/api/v1/preview` | `url` | URL/link preview functionality |
+| 29 | `GET` | `/api/v1/image?url=...` | `url` (query param) | Image proxy — passes URL as query parameter |
+| 30 | `GET` | `/api/v1/redirect?url=...` | `url`, `redirect`, `next` (query param) | Open redirect that might be fetched server-side |
+
+---
+
+### 8.9 How to Discover the Real Endpoints
+
+The endpoints above are educated guesses based on common patterns. To find the **actual** endpoints:
+
+**Method A — Passive traffic capture:**
+1. Open Burp, proxy the browser, browse every page and feature of the dashboard.
+2. In **Proxy → HTTP history**, sort by path.
+3. Every unique path is a real endpoint you can test.
+
+**Method B — JavaScript source analysis:**
+1. In browser DevTools, go to **Sources** (or **Network** → filter by JS).
+2. Search the JavaScript bundles for strings like `fetch(`, `axios`, `/api/`, `webhook`, `url`, `endpoint`.
+3. These reveal the actual API routes the frontend calls.
+
+**Method C — Sitemap in Burp:**
+1. After browsing the app, go to **Target → Site map**.
+2. Expand the target host tree.
+3. This shows every path Burp has observed, organized hierarchically.
+
+**Method D — Check for API documentation:**
+1. Try these common paths for exposed API docs:
+   - `/api/docs`
+   - `/api/v1/docs`
+   - `/swagger`
+   - `/swagger-ui`
+   - `/swagger.json`
+   - `/openapi.json`
+   - `/api-docs`
+   - `/graphql` (GraphQL Playground)
+   - `/graphiql`
+
+---
+
+## 9. Disclaimer
 
 This analysis is performed under authorized bug bounty testing scope. All findings are based on:
 - URL structure analysis
