@@ -1,0 +1,112 @@
+{
+  "oob_domain": "d74e0jpgvede30gkfecg6bthaa859coa5.oast.live",
+  "interactions": [],
+  "templates_found": [
+    {
+      "id": "69c8db0f2b6ccb005d77738d",
+      "name": "venu",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8db052b6ccb005d77738c",
+      "name": "venu",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dc4964ecb8006801958b",
+      "name": "venu",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8ddca629242005dba88d8",
+      "name": "venu",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8deee2b6ccb005d777529",
+      "name": "venu",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfb964ecb80068019595",
+      "name": "venu",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfc3629242005dba88e2",
+      "name": "ssrf-test-baseline-oob",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfc42b6ccb005d777539",
+      "name": "ssrf-test-localhost-127",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfc6629242005dba88e3",
+      "name": "ssrf-test-localhost-name",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfc7629242005dba88e4",
+      "name": "ssrf-test-aws-imdsv1",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfc8629242005dba88e5",
+      "name": "ssrf-test-aws-imdsv2",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfc964ecb80068019596",
+      "name": "ssrf-test-gcp-metadata",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfca629242005dba88e6",
+      "name": "ssrf-test-k8s-api",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfcb64ecb80068019597",
+      "name": "ssrf-test-ipv6-localhost",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfcc2b6ccb005d77753a",
+      "name": "ssrf-test-hex-ip",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfcd64ecb80068019598",
+      "name": "ssrf-test-octal-ip",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfcf64ecb80068019599",
+      "name": "ssrf-test-nip-io",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfd02b6ccb005d77753b",
+      "name": "ssrf-test-bare-hostname",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfd12b6ccb005d77753c",
+      "name": "ssrf-test-unreachable",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfd264ecb8006801959a",
+      "name": "ssrf-test-10net",
+      "webhook_url": ""
+    },
+    {
+      "id": "69c8dfd364ecb8006801959b",
+      "name": "ssrf-test-header-host",
+      "webhook_url": ""
+    }
+  ],
+  "new_template_id": "69c8e051629242005dba88e7"
+}
