@@ -1,0 +1,8 @@
+# Pentest generated reports (re-generate with scripts)
+pentest/reports/*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
